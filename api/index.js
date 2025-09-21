@@ -1,33 +1,16 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const connectDB = require('../dist/config/db').default;
-const authRoutes = require('../dist/routes/authRoutes').default;
-const userRoutes = require('../dist/routes/userRoutes').default;
-const overviewRoutes = require('../dist/routes/overviewRoutes').default;
-const payoutRoutes = require('../dist/routes/payoutRoutes').default;
-const exchangeHistoryRoutes = require('../dist/routes/exchangeHistoryRoutes').default;
-const addressRoutes = require('../dist/routes/addressRoutes').default;
-const adminRoutes = require('../dist/routes/adminRoutes').default;
-const disputesRoutes = require('../dist/routes/disputesRoutes').default;
-const tokenChainRoutes = require('../dist/routes/tokenChainRoutes').default;
-const exchangeRoutes = require('../dist/routes/exchangeRoutes').default;
-const uploadRoutes = require('../dist/routes/uploadRoutes').default;
-const swaggerUi = require('swagger-ui-express');
-const swaggerSpec = require('../dist/config/swagger').default;
-const cors = require('cors');
-const passport = require('passport');
 
-// Load passport configuration
-require('../dist/config/passport');
-
+// Load environment variables first
 dotenv.config();
 
 const app = express();
 
+// Basic middleware setup
 app.use(express.json());
-app.use(passport.initialize());
 
-// CORS: allow frontend origin
+// CORS setup
+const cors = require('cors');
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
 
 app.use(
@@ -38,6 +21,49 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+
+// Database connection handling
+let dbConnected = false;
+let connectDB;
+
+const initializeDB = async () => {
+  if (!dbConnected && connectDB) {
+    try {
+      await connectDB();
+      dbConnected = true;
+      console.log('Database connected successfully');
+    } catch (err) {
+      console.error('Failed to connect to database:', err);
+      throw err;
+    }
+  }
+};
+
+// Middleware to ensure DB is connected (placed before routes)
+app.use(async (req, res, next) => {
+  try {
+    if (!connectDB) {
+      // Lazy load database connection
+      try {
+        const dbModule = require('../dist/config/db');
+        connectDB = dbModule.default || dbModule;
+      } catch (err) {
+        console.error('Failed to load database module:', err);
+        return res.status(500).json({ 
+          error: 'Database module not found',
+          message: 'Make sure to run npm run build first' 
+        });
+      }
+    }
+    await initializeDB();
+    next();
+  } catch (err) {
+    res.status(500).json({ 
+      error: 'Database connection failed',
+      message: err.message 
+    });
+  }
+});
 
 // Root health/info route
 app.get('/', (req, res) => {
@@ -59,66 +85,82 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Swagger UI and JSON spec
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: 'LedgerSwap API Documentation',
-  swaggerOptions: {
-    persistAuthorization: true,
-    docExpansion: 'none',
-    filter: true,
-    showRequestHeaders: true,
-  },
-  customfavIcon: '/favicon.ico',
-  explorer: true,
-}));
+// Lazy load and setup routes
+const setupRoutes = () => {
+  try {
+    // Load passport configuration
+    require('../dist/config/passport');
+    const passport = require('passport');
+    app.use(passport.initialize());
 
-app.get('/api-docs.json', (_req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.send(swaggerSpec);
-});
+    // Load routes with error handling
+    const loadRoute = (path, routePath) => {
+      try {
+        const routeModule = require(path);
+        const route = routeModule.default || routeModule;
+        app.use(routePath, route);
+      } catch (err) {
+        console.error(`Failed to load route ${path}:`, err);
+        // Create a fallback route that returns an error
+        app.use(routePath, (req, res) => {
+          res.status(500).json({ 
+            error: `Route ${routePath} not available`,
+            message: 'Build files may be missing' 
+          });
+        });
+      }
+    };
 
-// API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/overview', overviewRoutes);
-app.use('/api/payouts', payoutRoutes);
-app.use('/api/exchange-history', exchangeHistoryRoutes);
-app.use('/api/exchanges', exchangeRoutes);
-app.use('/api/addresses', addressRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/management', tokenChainRoutes);
-app.use('/api/disputes', disputesRoutes);
-app.use('/api/upload', uploadRoutes);
+    // Load all routes
+    loadRoute('../dist/routes/authRoutes', '/api/auth');
+    loadRoute('../dist/routes/userRoutes', '/api/users');
+    loadRoute('../dist/routes/overviewRoutes', '/api/overview');
+    loadRoute('../dist/routes/payoutRoutes', '/api/payouts');
+    loadRoute('../dist/routes/exchangeHistoryRoutes', '/api/exchange-history');
+    loadRoute('../dist/routes/exchangeRoutes', '/api/exchanges');
+    loadRoute('../dist/routes/addressRoutes', '/api/addresses');
+    loadRoute('../dist/routes/adminRoutes', '/api/admin');
+    loadRoute('../dist/routes/tokenChainRoutes', '/api/admin/management');
+    loadRoute('../dist/routes/disputesRoutes', '/api/disputes');
+    loadRoute('../dist/routes/uploadRoutes', '/api/upload');
 
-// Initialize database connection
-let dbConnected = false;
-
-const initializeDB = async () => {
-  if (!dbConnected) {
+    // Setup Swagger documentation
     try {
-      await connectDB();
-      dbConnected = true;
-      console.log('Database connected successfully');
+      const swaggerUi = require('swagger-ui-express');
+      const swaggerModule = require('../dist/config/swagger');
+      const swaggerSpec = swaggerModule.default || swaggerModule;
+
+      app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+        customCss: '.swagger-ui .topbar { display: none }',
+        customSiteTitle: 'LedgerSwap API Documentation',
+        swaggerOptions: {
+          persistAuthorization: true,
+          docExpansion: 'none',
+          filter: true,
+          showRequestHeaders: true,
+        },
+        customfavIcon: '/favicon.ico',
+        explorer: true,
+      }));
+
+      app.get('/api-docs.json', (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.send(swaggerSpec);
+      });
     } catch (err) {
-      console.error('Failed to connect to database:', err);
-      throw err;
+      console.error('Failed to setup Swagger:', err);
+      app.get('/api-docs', (req, res) => {
+        res.status(500).json({ error: 'API documentation not available' });
+      });
     }
+
+  } catch (err) {
+    console.error('Failed to setup routes:', err);
   }
 };
 
-// Middleware to ensure DB is connected
-app.use(async (req, res, next) => {
-  try {
-    await initializeDB();
-    next();
-  } catch (err) {
-    res.status(500).json({ 
-      error: 'Database connection failed',
-      message: err.message 
-    });
-  }
-});
+// Setup routes
+setupRoutes();
 
 // Handle graceful errors
 process.on('unhandledRejection', (reason) => {
