@@ -21,7 +21,7 @@ const options: swaggerJSDoc.Options = {
     security: [{ bearerAuth: [] }],
     servers: [
       {
-        url: process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 3002}`,
+        url: `https://ledger-swap-backend.vercel.app`,
       },
     ],
     paths: {
