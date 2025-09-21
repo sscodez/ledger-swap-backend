@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LedgerSwap API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .endpoint {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+        }
+        .method {
+            font-weight: bold;
+            color: #007bff;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 LedgerSwap API</h1>
+        <p>Welcome to the LedgerSwap API. This service provides endpoints for cryptocurrency exchange operations.</p>
+        
+        <h2>Available Endpoints:</h2>
+        
+        <div class="endpoint">
+            <span class="method">GET</span> <a href="/health">/health</a> - Health check endpoint
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">GET</span> <a href="/api-docs">/api-docs</a> - API Documentation (Swagger UI)
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">POST</span> /api/auth/* - Authentication endpoints
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">GET/POST</span> /api/users/* - User management endpoints
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">GET</span> /api/overview/* - Overview and statistics
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">GET/POST</span> /api/exchanges/* - Exchange operations
+        </div>
+        
+        <div class="endpoint">
+            <span class="method">GET/POST</span> /api/payouts/* - Payout management
+        </div>
+        
+        <h2>Status:</h2>
+        <div id="status">Checking API status...</div>
+        
+        <script>
+            // Check API health
+            fetch('/health')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('status').innerHTML = 
+                        `<span style="color: green;">✅ API is ${data.status}</span>`;
+                })
+                .catch(error => {
+                    document.getElementById('status').innerHTML = 
+                        '<span style="color: red;">❌ API is not responding</span>';
+                });
+        </script>
+    </div>
+</body>
+</html>
