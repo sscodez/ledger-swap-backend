@@ -118,9 +118,9 @@ router.get("/check-deposit/:coin", async (req, res) => {
 
 /**
  * @openapi
- * /api/crypto/swap-to-xrp:
+ * /api/crypto/swap:
  *   post:
- *     summary: Swap any supported coin to XRP
+ *     summary: Swap between supported coins
  *     tags: [Crypto]
  *     requestBody:
  *       required: true
@@ -132,9 +132,12 @@ router.get("/check-deposit/:coin", async (req, res) => {
  *               fromAsset:
  *                 type: string
  *                 enum: [BTC, IOTA, XDC, XRP, XLM]
+ *               toAsset:
+ *                 type: string
+ *                 enum: [BTC, IOTA, XDC, XRP, XLM]
  *               amount:
  *                 type: number
- *             required: [fromAsset, amount]
+ *             required: [fromAsset, toAsset, amount]
  *     responses:
  *       '200':
  *         description: Swap successful
@@ -148,15 +151,20 @@ router.get("/check-deposit/:coin", async (req, res) => {
  *                 details:
  *                   type: object
  *       '400':
- *         description: Coin not supported
+ *         description: Coin not supported or invalid swap
  *       '500':
  *         description: Server error
  */
-router.post("/swap-to-xrp", async (req, res) => {
+router.post("/swap", async (req, res) => {
   try {
-    const { fromAsset, amount } = req.body;
-    if (!SUPPORTED_COINS.includes(fromAsset.toUpperCase())) {
+    const { fromAsset, toAsset, amount } = req.body;
+    
+    if (!SUPPORTED_COINS.includes(fromAsset.toUpperCase()) || !SUPPORTED_COINS.includes(toAsset.toUpperCase())) {
       return res.status(400).json({ error: "Coin not supported" });
+    }
+
+    if (fromAsset.toUpperCase() === toAsset.toUpperCase()) {
+      return res.status(400).json({ error: "Cannot swap to the same asset" });
     }
 
     const timestamp = Date.now();
@@ -164,7 +172,7 @@ router.post("/swap-to-xrp", async (req, res) => {
     // Get a quote
     const query1 = signQuery({
       fromAsset: fromAsset.toUpperCase(),
-      toAsset: "XRP",
+      toAsset: toAsset.toUpperCase(),
       fromAmount: amount,
       timestamp,
     });
@@ -184,6 +192,215 @@ router.post("/swap-to-xrp", async (req, res) => {
     });
 
     res.json({ message: "Swap successful", details: convert.data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/crypto/withdraw:
+ *   post:
+ *     summary: Withdraw coins to user's wallet address
+ *     tags: [Crypto]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               coin:
+ *                 type: string
+ *                 enum: [BTC, IOTA, XDC, XRP, XLM]
+ *               amount:
+ *                 type: number
+ *               address:
+ *                 type: string
+ *               tag:
+ *                 type: string
+ *                 description: Required for XRP and XLM
+ *               network:
+ *                 type: string
+ *                 description: Network to use for withdrawal
+ *             required: [coin, amount, address]
+ *     responses:
+ *       '200':
+ *         description: Withdrawal successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 withdrawalId:
+ *                   type: string
+ *       '400':
+ *         description: Invalid parameters
+ *       '500':
+ *         description: Server error
+ */
+router.post("/withdraw", async (req, res) => {
+  try {
+    const { coin, amount, address, tag, network } = req.body;
+    
+    if (!SUPPORTED_COINS.includes(coin.toUpperCase())) {
+      return res.status(400).json({ error: "Coin not supported" });
+    }
+
+    if (!address) {
+      return res.status(400).json({ error: "Withdrawal address is required" });
+    }
+
+    const timestamp = Date.now();
+    const withdrawParams: any = {
+      coin: coin.toUpperCase(),
+      amount,
+      address,
+      timestamp,
+    };
+
+    // Add network if provided
+    if (network) {
+      withdrawParams.network = network;
+    }
+
+    // Add tag for coins that require it (XRP, XLM)
+    if (tag && (coin.toUpperCase() === 'XRP' || coin.toUpperCase() === 'XLM')) {
+      withdrawParams.addressTag = tag;
+    }
+
+    const query = signQuery(withdrawParams);
+
+    const result = await axios.post(`${BASE_URL}/sapi/v1/capital/withdraw/apply?${query}`, {}, {
+      headers: { "X-MBX-APIKEY": API_KEY },
+    });
+
+    res.json({ 
+      message: "Withdrawal initiated successfully", 
+      withdrawalId: result.data.id 
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.response?.data || err.message });
+  }
+});
+
+/**
+ * @openapi
+ * /api/crypto/swap-and-withdraw:
+ *   post:
+ *     summary: Complete flow - swap coins and withdraw to user address
+ *     tags: [Crypto]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fromAsset:
+ *                 type: string
+ *                 enum: [BTC, IOTA, XDC, XRP, XLM]
+ *               toAsset:
+ *                 type: string
+ *                 enum: [BTC, IOTA, XDC, XRP, XLM]
+ *               amount:
+ *                 type: number
+ *               withdrawalAddress:
+ *                 type: string
+ *               withdrawalTag:
+ *                 type: string
+ *                 description: Required for XRP and XLM withdrawals
+ *               network:
+ *                 type: string
+ *                 description: Network to use for withdrawal
+ *             required: [fromAsset, toAsset, amount, withdrawalAddress]
+ *     responses:
+ *       '200':
+ *         description: Swap and withdrawal successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 swapDetails:
+ *                   type: object
+ *                 withdrawalId:
+ *                   type: string
+ *       '400':
+ *         description: Invalid parameters
+ *       '500':
+ *         description: Server error
+ */
+router.post("/swap-and-withdraw", async (req, res) => {
+  try {
+    const { fromAsset, toAsset, amount, withdrawalAddress, withdrawalTag, network } = req.body;
+    
+    if (!SUPPORTED_COINS.includes(fromAsset.toUpperCase()) || !SUPPORTED_COINS.includes(toAsset.toUpperCase())) {
+      return res.status(400).json({ error: "Coin not supported" });
+    }
+
+    if (fromAsset.toUpperCase() === toAsset.toUpperCase()) {
+      return res.status(400).json({ error: "Cannot swap to the same asset" });
+    }
+
+    if (!withdrawalAddress) {
+      return res.status(400).json({ error: "Withdrawal address is required" });
+    }
+
+    // Step 1: Perform the swap
+    const timestamp1 = Date.now();
+    const query1 = signQuery({
+      fromAsset: fromAsset.toUpperCase(),
+      toAsset: toAsset.toUpperCase(),
+      fromAmount: amount,
+      timestamp: timestamp1,
+    });
+
+    const quote = await axios.post(`${BASE_URL}/sapi/v1/convert/getQuote?${query1}`, {}, {
+      headers: { "X-MBX-APIKEY": API_KEY },
+    });
+
+    const query2 = signQuery({
+      quoteId: quote.data.quoteId,
+      timestamp: Date.now(),
+    });
+
+    const convert = await axios.post(`${BASE_URL}/sapi/v1/convert/acceptQuote?${query2}`, {}, {
+      headers: { "X-MBX-APIKEY": API_KEY },
+    });
+
+    // Step 2: Withdraw the converted amount
+    const timestamp2 = Date.now();
+    const withdrawParams: any = {
+      coin: toAsset.toUpperCase(),
+      amount: convert.data.toAmount || quote.data.toAmount,
+      address: withdrawalAddress,
+      timestamp: timestamp2,
+    };
+
+    if (network) {
+      withdrawParams.network = network;
+    }
+
+    if (withdrawalTag && (toAsset.toUpperCase() === 'XRP' || toAsset.toUpperCase() === 'XLM')) {
+      withdrawParams.addressTag = withdrawalTag;
+    }
+
+    const withdrawQuery = signQuery(withdrawParams);
+
+    const withdrawal = await axios.post(`${BASE_URL}/sapi/v1/capital/withdraw/apply?${withdrawQuery}`, {}, {
+      headers: { "X-MBX-APIKEY": API_KEY },
+    });
+
+    res.json({ 
+      message: "Swap and withdrawal completed successfully",
+      swapDetails: convert.data,
+      withdrawalId: withdrawal.data.id
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.response?.data || err.message });
   }
