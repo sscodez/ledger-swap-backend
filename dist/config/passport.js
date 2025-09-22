@@ -16,51 +16,63 @@ const passport_1 = __importDefault(require("passport"));
 const passport_google_oauth20_1 = require("passport-google-oauth20");
 const passport_facebook_1 = require("passport-facebook");
 const User_1 = __importDefault(require("../models/User"));
-passport_1.default.use(new passport_google_oauth20_1.Strategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: '/api/auth/google/callback',
-}, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    try {
-        let user = yield User_1.default.findOne({ googleId: profile.id });
-        if (!user) {
-            user = yield User_1.default.create({
-                googleId: profile.id,
-                name: profile.displayName,
-                email: (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value,
-                profilePicture: (_b = profile.photos) === null || _b === void 0 ? void 0 : _b[0].value,
-            });
+// Only configure Google OAuth if credentials are provided
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport_1.default.use(new passport_google_oauth20_1.Strategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: '/api/auth/google/callback',
+    }, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
+        var _a, _b;
+        try {
+            let user = yield User_1.default.findOne({ googleId: profile.id });
+            if (!user) {
+                user = yield User_1.default.create({
+                    googleId: profile.id,
+                    name: profile.displayName,
+                    email: (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value,
+                    profilePicture: (_b = profile.photos) === null || _b === void 0 ? void 0 : _b[0].value,
+                });
+            }
+            done(null, user);
         }
-        done(null, user);
-    }
-    catch (error) {
-        done(error, false);
-    }
-})));
-passport_1.default.use(new passport_facebook_1.Strategy({
-    clientID: process.env.FACEBOOK_APP_ID,
-    clientSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackURL: '/api/auth/facebook/callback',
-    profileFields: ['id', 'displayName', 'emails', 'picture.type(large)'],
-}, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
-    try {
-        let user = yield User_1.default.findOne({ facebookId: profile.id });
-        if (!user) {
-            user = yield User_1.default.create({
-                facebookId: profile.id,
-                name: profile.displayName,
-                email: (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value,
-                profilePicture: (_b = profile.photos) === null || _b === void 0 ? void 0 : _b[0].value,
-            });
+        catch (error) {
+            done(error, false);
         }
-        done(null, user);
-    }
-    catch (error) {
-        done(error, false);
-    }
-})));
+    })));
+}
+else {
+    console.warn('Google OAuth not configured - missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET');
+}
+// Only configure Facebook OAuth if credentials are provided
+if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
+    passport_1.default.use(new passport_facebook_1.Strategy({
+        clientID: process.env.FACEBOOK_APP_ID,
+        clientSecret: process.env.FACEBOOK_APP_SECRET,
+        callbackURL: '/api/auth/facebook/callback',
+        profileFields: ['id', 'displayName', 'emails', 'picture.type(large)'],
+    }, (accessToken, refreshToken, profile, done) => __awaiter(void 0, void 0, void 0, function* () {
+        var _a, _b;
+        try {
+            let user = yield User_1.default.findOne({ facebookId: profile.id });
+            if (!user) {
+                user = yield User_1.default.create({
+                    facebookId: profile.id,
+                    name: profile.displayName,
+                    email: (_a = profile.emails) === null || _a === void 0 ? void 0 : _a[0].value,
+                    profilePicture: (_b = profile.photos) === null || _b === void 0 ? void 0 : _b[0].value,
+                });
+            }
+            done(null, user);
+        }
+        catch (error) {
+            done(error, false);
+        }
+    })));
+}
+else {
+    console.warn('Facebook OAuth not configured - missing FACEBOOK_APP_ID or FACEBOOK_APP_SECRET');
+}
 passport_1.default.serializeUser((user, done) => {
     done(null, user.id);
 });

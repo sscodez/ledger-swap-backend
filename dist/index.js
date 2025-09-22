@@ -31,6 +31,7 @@ const swagger_ui_express_1 = __importDefault(require("swagger-ui-express"));
 const swagger_1 = __importDefault(require("./config/swagger"));
 const cors_1 = __importDefault(require("cors"));
 const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
+const cryptoRoutes_1 = __importDefault(require("./routes/cryptoRoutes"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -95,6 +96,19 @@ app.use('/api/admin', adminRoutes_1.default);
 app.use('/api/admin/management', tokenChainRoutes_1.default);
 app.use('/api/disputes', disputesRoutes_1.default);
 app.use('/api/upload', uploadRoutes_1.default);
+app.use('/api/crypto', cryptoRoutes_1.default);
+function start() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield (0, db_1.default)();
+            app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+        }
+        catch (err) {
+            console.error('Failed to start server:', err);
+            process.exit(1);
+        }
+    });
+}
 // Handle graceful shutdown and unhandled errors
 process.on('unhandledRejection', (reason) => {
     console.error('Unhandled Rejection:', reason);
@@ -102,36 +116,4 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
 });
-
-// Initialize database connection for serverless
-let dbConnected = false;
-const initializeDB = () => __awaiter(void 0, void 0, void 0, function* () {
-    if (!dbConnected) {
-        try {
-            yield (0, db_1.default)();
-            dbConnected = true;
-            console.log('Database connected successfully');
-        }
-        catch (err) {
-            console.error('Database initialization failed:', err);
-            throw err;
-        }
-    }
-});
-
-// Middleware to ensure DB is connected before handling requests
-app.use((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        yield initializeDB();
-        next();
-    }
-    catch (err) {
-        res.status(500).json({
-            error: 'Database connection failed',
-            message: err.message
-        });
-    }
-}));
-
-// Export the Express app for Vercel
-module.exports = app;
+start();

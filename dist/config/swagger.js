@@ -25,12 +25,49 @@ const options = {
         security: [{ bearerAuth: [] }],
         servers: [
             {
-                url: `${process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3002}`}`,
+                url: `https://ledger-swap-backend.vercel.app`,
             },
         ],
+        paths: {
+            '/': {
+                get: {
+                    summary: 'Health check endpoint',
+                    tags: ['Health'],
+                    responses: {
+                        '200': {
+                            description: 'API is running',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            status: { type: 'string' },
+                                            timestamp: { type: 'string' },
+                                            version: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            '/health': {
+                get: {
+                    summary: 'Service health status',
+                    tags: ['Health'],
+                    responses: {
+                        '200': {
+                            description: 'Service is healthy'
+                        }
+                    }
+                }
+            }
+        }
     },
-    // Globs to look for JSDoc comments describing endpoints
-    apis: ['src/routes/**/*.ts', 'src/controllers/**/*.ts'],
+    // Look for JSDoc comments in both source and compiled files
+    apis: ['src/routes/**/*.ts', 'src/controllers/**/*.ts', 'dist/routes/**/*.js', 'dist/controllers/**/*.js'],
 };
 const swaggerSpec = (0, swagger_jsdoc_1.default)(options);
 exports.default = swaggerSpec;
