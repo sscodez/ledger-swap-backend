@@ -6,9 +6,9 @@ import User from '../models/User';
 // Get base URL from environment or use default
 const getBaseUrl = () => {
   if (process.env.NODE_ENV === 'production') {
-    return process.env.BACKEND_URL || 'https://api.ledgerswap.io';
+    return 'https://ledger-swap-backend.vercel.app';
   }
-  return process.env.BACKEND_URL || 'http://localhost:8080';
+  return 'https://ledger-swap-backend.vercel.app';
 };
 
 const BASE_URL = getBaseUrl();
