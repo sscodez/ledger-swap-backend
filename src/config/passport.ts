@@ -3,12 +3,22 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 import User from '../models/User';
 
+// Get base URL from environment or use default
+const getBaseUrl = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return process.env.BACKEND_URL || 'https://api.ledgerswap.io';
+  }
+  return process.env.BACKEND_URL || 'http://localhost:8080';
+};
+
+const BASE_URL = getBaseUrl();
+
 // Only configure Google OAuth if credentials are provided
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: '/api/auth/google/callback',
+    callbackURL: `${BASE_URL}/api/auth/google/callback`,
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
@@ -37,7 +47,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
   passport.use(new FacebookStrategy({
     clientID: process.env.FACEBOOK_APP_ID,
     clientSecret: process.env.FACEBOOK_APP_SECRET,
-    callbackURL: '/api/auth/facebook/callback',
+    callbackURL: `${BASE_URL}/api/auth/facebook/callback`,
     profileFields: ['id', 'displayName', 'emails', 'picture.type(large)'],
   },
   async (accessToken, refreshToken, profile, done) => {
