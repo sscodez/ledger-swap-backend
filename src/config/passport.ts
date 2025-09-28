@@ -36,6 +36,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       done(null, user);
     } catch (error) {
       done(error, false);
+      console.log(error)
     }
   }));
 } else {

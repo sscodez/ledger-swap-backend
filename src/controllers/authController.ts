@@ -106,7 +106,7 @@ export const googleCallback = (req: Request, res: Response) => {
   const user = req.user as any;
   const token = generateToken(user._id.toString());
   // Redirect to frontend with token
-  res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
+  res.redirect(`https://ledgerswap.io/?token=${token}`);
 };
 
 export const facebookCallback = (req: Request, res: Response) => {
