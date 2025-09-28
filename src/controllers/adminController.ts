@@ -28,29 +28,48 @@ export const adminFlagAddress = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'coin, network, and address are required' });
     }
 
+    // Check if address is already flagged
+    const existingAddress = await Address.findOne({ address: address.trim() });
+    if (existingAddress && existingAddress.flagged) {
+      return res.status(409).json({ 
+        message: 'This address is already flagged',
+        existing: {
+          address: existingAddress.address,
+          coin: existingAddress.coin,
+          network: existingAddress.network,
+          flaggedAt: existingAddress.flaggedAt,
+          flaggedReason: existingAddress.flaggedReason
+        }
+      });
+    }
+
     const authReq = req as AuthRequest;
     const now = new Date();
     const update: any = {
-      coin,
-      network,
-      address,
+      coin: coin.trim(),
+      network: network.trim(),
+      address: address.trim(),
       label: 'flagged',
       flagged: true,
       flaggedAt: now,
     };
-    if (reason) update.flaggedReason = reason;
+    if (reason && reason.trim()) update.flaggedReason = reason.trim();
     // attach the admin user as creator/owner to satisfy schema requirement
     if (authReq.user?._id) update.user = authReq.user._id;
 
     // Upsert by unique address
     const doc = await Address.findOneAndUpdate(
-      { address },
+      { address: address.trim() },
       { $set: update },
       { new: true, upsert: true }
     );
 
     res.status(201).json(doc);
   } catch (err: any) {
+    // Handle MongoDB duplicate key error
+    if (err.code === 11000) {
+      return res.status(409).json({ message: 'This address is already in the system' });
+    }
     res.status(500).json({ message: 'Failed to flag address', error: err.message });
   }
 };

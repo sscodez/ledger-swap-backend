@@ -30,8 +30,25 @@ export const createExchangeHistory: RequestHandler = async (req: Request, res: R
 export const getExchangeHistory: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
   try {
-    const exchangeHistory = await ExchangeHistory.find({ user: authReq.user!._id });
-    res.json(exchangeHistory);
+    const { page = '1', limit = '10', sort = '-createdAt' } = req.query as Record<string, string>;
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const limitNum = Math.max(Math.min(parseInt(limit, 10) || 10, 100), 1);
+
+    const [items, total] = await Promise.all([
+      ExchangeHistory.find({ user: authReq.user!._id })
+        .sort(sort)
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum),
+      ExchangeHistory.countDocuments({ user: authReq.user!._id }),
+    ]);
+
+    res.json({
+      page: pageNum,
+      limit: limitNum,
+      total,
+      pages: Math.ceil(total / limitNum),
+      items,
+    });
   } catch (error) {
     if (error instanceof Error) {
       res.status(500).json({ message: 'Server error', error: error.message });
