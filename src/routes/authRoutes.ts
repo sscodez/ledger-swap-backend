@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, resetPassword } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -186,5 +186,62 @@ router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }))
  *         description: Facebook OAuth success
  */
 router.get('/facebook/callback', passport.authenticate('facebook', { failureRedirect: '/login' }), facebookCallback);
+
+// Password Reset Routes
+/**
+ * @openapi
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Send password reset email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required: [email]
+ *     responses:
+ *       '200':
+ *         description: Password reset email sent (if account exists)
+ *       '400':
+ *         description: Invalid email format
+ *       '500':
+ *         description: Server error
+ */
+router.post('/forgot-password', loginRateLimit, forgotPassword);
+
+/**
+ * @openapi
+ * /api/auth/reset-password:
+ *   post:
+ *     summary: Reset password with token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *             required: [token, password]
+ *     responses:
+ *       '200':
+ *         description: Password reset successfully
+ *       '400':
+ *         description: Invalid or expired token
+ *       '500':
+ *         description: Server error
+ */
+router.post('/reset-password', resetPassword);
 
 export default router;
