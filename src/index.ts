@@ -18,6 +18,7 @@ import swaggerSpec from './config/swagger';
 import cors from 'cors';
 import uploadRoutes from './routes/uploadRoutes';
 import cryptoRoutes from './routes/cryptoRoutes';
+import blogRoutes from './routes/blogRoutes';
 
 dotenv.config();
 const app = express();
@@ -95,6 +96,7 @@ app.use('/api/admin/management', tokenChainRoutes);
 app.use('/api/disputes', disputesRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/crypto', cryptoRoutes);
+app.use('/api/blogs', blogRoutes);
 
 
 
