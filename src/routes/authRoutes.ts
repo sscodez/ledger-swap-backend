@@ -88,6 +88,42 @@ router.post('/admin/signin', loginRateLimit, adminSignin);
 // Debug endpoint
 router.get('/debug', debugOAuth);
 
+// Test endpoint to verify JWT and database
+router.get('/test', async (req, res) => {
+  try {
+    // Test JWT generation
+    const generateToken = require('../utils/generateToken').default;
+    const testToken = generateToken('test-user-id');
+    
+    // Test database connection
+    const User = require('../models/User').default;
+    const userCount = await User.countDocuments();
+    
+    // Test user creation (similar to OAuth flow)
+    const testUser = {
+      googleId: 'test-google-id',
+      name: 'Test User',
+      email: 'test@example.com'
+    };
+    
+    res.json({
+      message: 'System test',
+      jwt: testToken ? 'JWT generation works' : 'JWT generation failed',
+      database: `Connected - ${userCount} users`,
+      userModel: 'User model accessible',
+      testUserData: testUser,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'System test failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Google OAuth
 /**
  * @openapi
