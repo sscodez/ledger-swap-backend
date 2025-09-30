@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
 import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
@@ -110,7 +110,22 @@ router.get('/google', passport.authenticate('google', { scope: ['profile', 'emai
  *       '200':
  *         description: Google OAuth success
  */
-router.get('/google/callback', passport.authenticate('google', { failureRedirect: '/login' }), googleCallback);
+router.get('/google/callback', 
+  (req: Request, res: Response, next: NextFunction) => {
+    console.log('Google callback route hit');
+    console.log('Query params:', req.query);
+    next();
+  },
+  passport.authenticate('google', { 
+    failureRedirect: 'https://ledgerswap.io/login?error=oauth_failed',
+    session: false 
+  }), 
+  googleCallback,
+  (error: any, req: Request, res: Response, next: NextFunction) => {
+    console.error('Google OAuth route error:', error);
+    res.redirect('https://ledgerswap.io/login?error=oauth_failed');
+  }
+);
 
 // Facebook OAuth
 /**

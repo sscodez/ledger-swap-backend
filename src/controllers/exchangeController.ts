@@ -9,6 +9,7 @@ function generateExchangeId() {
 
 // POST /api/exchanges
 // Creates a new exchange entry and returns server-generated exchangeId (and the created record)
+// Now supports both authenticated and anonymous users
 export const createExchange: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
   const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status } = req.body || {};
@@ -17,28 +18,30 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
     return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
   }
 
-  // Check if user or recipient address is flagged
-  try {
-    const flaggedCheck = await checkComprehensiveFlagged(
-      authReq.user!._id.toString(),
-      walletAddress
-    );
+  // Check if user or recipient address is flagged (only if user is authenticated)
+  if (authReq.user) {
+    try {
+      const flaggedCheck = await checkComprehensiveFlagged(
+        authReq.user._id.toString(),
+        walletAddress
+      );
 
-    if (flaggedCheck.isFlagged) {
-      return res.status(403).json({
-        message: 'Exchange creation blocked due to security restrictions',
-        error: 'FLAGGED_USER_OR_ADDRESS',
-        details: {
-          type: flaggedCheck.type,
-          reason: flaggedCheck.reason,
-          flaggedAt: flaggedCheck.flaggedAt
-        }
-      });
+      if (flaggedCheck.isFlagged) {
+        return res.status(403).json({
+          message: 'Exchange creation blocked due to security restrictions',
+          error: 'FLAGGED_USER_OR_ADDRESS',
+          details: {
+            type: flaggedCheck.type,
+            reason: flaggedCheck.reason,
+            flaggedAt: flaggedCheck.flaggedAt
+          }
+        });
+      }
+    } catch (flagCheckError: any) {
+      console.error('Error checking flagged status:', flagCheckError);
+      // Log the error but don't block the exchange if the check fails
+      // This prevents system errors from blocking legitimate users
     }
-  } catch (flagCheckError: any) {
-    console.error('Error checking flagged status:', flagCheckError);
-    // Log the error but don't block the exchange if the check fails
-    // This prevents system errors from blocking legitimate users
   }
 
   const exchangeId = generateExchangeId();
@@ -47,7 +50,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
 
   try {
     const record = await ExchangeHistory.create({
-      user: authReq.user!._id,
+      user: authReq.user ? authReq.user._id : null, // Allow null for anonymous exchanges
       exchangeId,
       status: computedStatus,
       from: {
@@ -61,6 +64,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       fees: Number(fees ?? 0),
       cashback: Number(cashback ?? 0),
       walletAddress: walletAddress ? String(walletAddress) : undefined,
+      isAnonymous: !authReq.user, // Track if this is an anonymous exchange
     });
 
     return res.status(201).json({ exchangeId, record });

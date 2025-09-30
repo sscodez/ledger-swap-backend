@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IExchangeHistory extends Document {
-  user: mongoose.Types.ObjectId;
+  user?: mongoose.Types.ObjectId | null; // Optional for anonymous exchanges
   exchangeId: string;
   status: 'completed' | 'pending' | 'failed' | 'in_review';
   date: Date;
@@ -11,13 +11,15 @@ export interface IExchangeHistory extends Document {
   cashback: number;
   walletAddress?: string;
   network?: string;
+  isAnonymous?: boolean; // Track if this is an anonymous exchange
 }
 
 const exchangeHistorySchema: Schema = new Schema({
   user: {
     type: Schema.Types.ObjectId,
-    required: true,
+    required: false, // Allow null for anonymous exchanges
     ref: 'User',
+    default: null,
   },
   exchangeId: {
     type: String,
@@ -56,6 +58,11 @@ const exchangeHistorySchema: Schema = new Schema({
   network: {
     type: String,
     index: true,
+  },
+  isAnonymous: {
+    type: Boolean,
+    default: false,
+    index: true, // Index for filtering anonymous vs authenticated exchanges
   },
 }, {
   timestamps: true,
