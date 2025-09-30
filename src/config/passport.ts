@@ -15,6 +15,10 @@ const BASE_URL = getBaseUrl();
 
 // Only configure Google OAuth if credentials are provided
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  console.log('Configuring Google OAuth Strategy...');
+  console.log('Google Client ID length:', process.env.GOOGLE_CLIENT_ID.length);
+  console.log('Callback URL:', `${BASE_URL}/api/auth/google/callback`);
+  
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,

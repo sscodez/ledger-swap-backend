@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -84,6 +84,9 @@ router.post('/signin', loginRateLimit, signin);
  *         description: Too many login attempts
  */
 router.post('/admin/signin', loginRateLimit, adminSignin);
+
+// Debug endpoint
+router.get('/debug', debugOAuth);
 
 // Google OAuth
 /**

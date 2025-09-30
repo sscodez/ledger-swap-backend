@@ -4,6 +4,25 @@ import User from '../models/User';
 import Overview from '../models/Overview';
 import generateToken from '../utils/generateToken';
 
+// Debug endpoint to check OAuth configuration
+export const debugOAuth = (req: Request, res: Response) => {
+  const config = {
+    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+    hasJwtSecret: !!process.env.JWT_SECRET,
+    hasFrontendUrl: !!process.env.FRONTEND_URL,
+    nodeEnv: process.env.NODE_ENV,
+    googleClientIdLength: process.env.GOOGLE_CLIENT_ID?.length || 0,
+    googleClientSecretLength: process.env.GOOGLE_CLIENT_SECRET?.length || 0,
+  };
+  
+  res.json({
+    message: 'OAuth Configuration Debug',
+    config,
+    timestamp: new Date().toISOString()
+  });
+};
+
 export const signup = async (req: Request, res: Response) => {
   const { name, email, password } = req.body;
 
