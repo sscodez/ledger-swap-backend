@@ -1,6 +1,7 @@
 import { Request, Response, RequestHandler } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import ExchangeHistory from '../models/ExchangeHistory';
+import { checkComprehensiveFlagged } from '../utils/flaggedCheck';
 
 function generateExchangeId() {
   return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
@@ -14,6 +15,30 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
 
   if (!fromCurrency || !toCurrency) {
     return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
+  }
+
+  // Check if user or recipient address is flagged
+  try {
+    const flaggedCheck = await checkComprehensiveFlagged(
+      authReq.user!._id.toString(),
+      walletAddress
+    );
+
+    if (flaggedCheck.isFlagged) {
+      return res.status(403).json({
+        message: 'Exchange creation blocked due to security restrictions',
+        error: 'FLAGGED_USER_OR_ADDRESS',
+        details: {
+          type: flaggedCheck.type,
+          reason: flaggedCheck.reason,
+          flaggedAt: flaggedCheck.flaggedAt
+        }
+      });
+    }
+  } catch (flagCheckError: any) {
+    console.error('Error checking flagged status:', flagCheckError);
+    // Log the error but don't block the exchange if the check fails
+    // This prevents system errors from blocking legitimate users
   }
 
   const exchangeId = generateExchangeId();

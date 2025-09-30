@@ -10,6 +10,9 @@ export interface IUser extends Document {
   country?: string;
   profilePicture?: string;
   role?: 'user' | 'admin';
+  flagged?: boolean;
+  flaggedReason?: string;
+  flaggedAt?: Date;
 }
 
 const userSchema: Schema = new Schema({
@@ -46,6 +49,17 @@ const userSchema: Schema = new Schema({
     enum: ['user', 'admin'],
     default: 'user',
     required: true,
+  },
+  flagged: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  flaggedReason: {
+    type: String,
+  },
+  flaggedAt: {
+    type: Date,
   },
 }, {
   timestamps: true,
