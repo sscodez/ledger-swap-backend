@@ -103,15 +103,40 @@ export const signin = async (req: Request, res: Response) => {
 };
 
 export const googleCallback = (req: Request, res: Response) => {
-  const user = req.user as any;
-  const token = generateToken(user._id.toString());
-  // Redirect to frontend with token
-  res.redirect(`https://ledgerswap.io/?token=${token}`);
+  try {
+    const user = req.user as any;
+    
+    if (!user) {
+      console.error('Google OAuth: No user found in request');
+      return res.redirect(`https://ledgerswap.io/login?error=oauth_failed`);
+    }
+
+    const token = generateToken(user._id.toString());
+    
+    // Redirect to frontend with token
+    res.redirect(`https://ledgerswap.io/?token=${token}`);
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    res.redirect(`https://ledgerswap.io/login?error=oauth_failed`);
+  }
 };
 
 export const facebookCallback = (req: Request, res: Response) => {
-  const user = req.user as any;
-  const token = generateToken(user._id.toString());
-  // Redirect to frontend with token
-  res.redirect(`${process.env.FRONTEND_URL}/?token=${token}`);
+  try {
+    const user = req.user as any;
+    
+    if (!user) {
+      console.error('Facebook OAuth: No user found in request');
+      return res.redirect(`https://ledgerswap.io/login?error=oauth_failed`);
+    }
+
+    const token = generateToken(user._id.toString());
+    const frontendUrl = process.env.FRONTEND_URL || 'https://ledgerswap.io';
+    
+    // Redirect to frontend with token
+    res.redirect(`${frontendUrl}/?token=${token}`);
+  } catch (error) {
+    console.error('Facebook OAuth callback error:', error);
+    res.redirect(`https://ledgerswap.io/login?error=oauth_failed`);
+  }
 };

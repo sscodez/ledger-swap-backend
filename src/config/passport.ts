@@ -22,21 +22,41 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   },
   async (accessToken, refreshToken, profile, done) => {
     try {
+      console.log('Google OAuth Profile:', {
+        id: profile.id,
+        displayName: profile.displayName,
+        email: profile.emails?.[0]?.value
+      });
+
       let user = await User.findOne({ googleId: profile.id });
 
       if (!user) {
-        user = await User.create({
-          googleId: profile.id,
-          name: profile.displayName,
-          email: profile.emails?.[0].value,
-          profilePicture: profile.photos?.[0].value,
-        });
+        // Check if user exists with same email
+        const existingUser = await User.findOne({ email: profile.emails?.[0]?.value });
+        
+        if (existingUser) {
+          // Link Google account to existing user
+          existingUser.googleId = profile.id;
+          if (!existingUser.profilePicture && profile.photos?.[0]?.value) {
+            existingUser.profilePicture = profile.photos[0].value;
+          }
+          user = await existingUser.save();
+        } else {
+          // Create new user
+          user = await User.create({
+            googleId: profile.id,
+            name: profile.displayName || 'Google User',
+            email: profile.emails?.[0]?.value || '',
+            profilePicture: profile.photos?.[0]?.value,
+          });
+        }
       }
 
+      console.log('Google OAuth Success - User:', user._id);
       done(null, user);
     } catch (error) {
+      console.error('Google OAuth Strategy Error:', error);
       done(error, false);
-      console.log(error)
     }
   }));
 } else {
