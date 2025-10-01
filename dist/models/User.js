@@ -82,6 +82,23 @@ const userSchema = new mongoose_1.Schema({
         default: 'user',
         required: true,
     },
+    flagged: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    flaggedReason: {
+        type: String,
+    },
+    flaggedAt: {
+        type: Date,
+    },
+    resetPasswordToken: {
+        type: String,
+    },
+    resetPasswordExpires: {
+        type: Date,
+    },
 }, {
     timestamps: true,
 });

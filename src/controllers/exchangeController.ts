@@ -2,6 +2,7 @@ import { Request, Response, RequestHandler } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import ExchangeHistory from '../models/ExchangeHistory';
 import { checkComprehensiveFlagged } from '../utils/flaggedCheck';
+import { getOrCreateDepositAddress, SUPPORTED_CHAINS } from '../utils/kucoin';
 
 function generateExchangeId() {
   return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
@@ -45,10 +46,35 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
   }
 
   const exchangeId = generateExchangeId();
-  const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review']);
+  const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
   const computedStatus = allowedStatuses.has(String(status)) ? (String(status) as any) : 'pending';
 
   try {
+    // Generate KuCoin deposit address for the fromCurrency
+    let kucoinDepositAddress = null;
+    let kucoinDepositCurrency = null;
+    
+    const fromCurrencyUpper = String(fromCurrency).toUpperCase();
+    if (SUPPORTED_CHAINS[fromCurrencyUpper as keyof typeof SUPPORTED_CHAINS]) {
+      const chainConfig = SUPPORTED_CHAINS[fromCurrencyUpper as keyof typeof SUPPORTED_CHAINS];
+      console.log(`🏦 Generating deposit address for ${fromCurrencyUpper}...`);
+      
+      try {
+        const depositAddressResult = await getOrCreateDepositAddress(chainConfig.currency, chainConfig.chain);
+        if (depositAddressResult && depositAddressResult.address) {
+          kucoinDepositAddress = depositAddressResult.address;
+          kucoinDepositCurrency = chainConfig.currency;
+          console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
+        }
+      } catch (depositError: any) {
+        console.error('❌ Failed to generate deposit address:', depositError.message);
+        // Continue without deposit address - can be generated later
+      }
+    }
+
+    // Set expiration time (5 minutes from now)
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
     const record = await ExchangeHistory.create({
       user: authReq.user ? authReq.user._id : null, // Allow null for anonymous exchanges
       exchangeId,
@@ -65,9 +91,26 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       cashback: Number(cashback ?? 0),
       walletAddress: walletAddress ? String(walletAddress) : undefined,
       isAnonymous: !authReq.user, // Track if this is an anonymous exchange
+      
+      // KuCoin Integration Fields
+      kucoinDepositAddress,
+      kucoinDepositCurrency,
+      depositReceived: false,
+      swapCompleted: false,
+      expiresAt,
+      monitoringActive: true,
     });
 
-    return res.status(201).json({ exchangeId, record });
+    console.log(`🎯 Exchange created: ${exchangeId}`);
+    console.log(`📍 Deposit address: ${kucoinDepositAddress || 'Not generated'}`);
+    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+
+    return res.status(201).json({ 
+      exchangeId, 
+      record,
+      depositAddress: kucoinDepositAddress,
+      expiresAt: expiresAt.toISOString()
+    });
   } catch (err: any) {
     return res.status(500).json({ message: 'Failed to create exchange', error: err?.message || String(err) });
   }
@@ -89,14 +132,33 @@ export const getExchangeById: RequestHandler = async (req: Request, res: Respons
 export const updateExchangeStatus: RequestHandler = async (req: Request, res: Response) => {
   try {
     const { exchangeId } = req.params as { exchangeId: string };
-    const { status } = req.body as { status?: string };
-    const allowed = new Set(['pending', 'completed', 'failed', 'in_review']);
+    const { status, kucoinOrderId, depositTxId, withdrawalTxId, depositAmount } = req.body;
+    const allowed = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
     if (!status || !allowed.has(String(status))) {
       return res.status(400).json({ message: 'Invalid status' });
     }
+    
+    const updateData: any = { status: String(status) };
+    
+    // Add optional KuCoin fields if provided
+    if (kucoinOrderId) updateData.kucoinOrderId = kucoinOrderId;
+    if (depositTxId) updateData.depositTxId = depositTxId;
+    if (withdrawalTxId) updateData.withdrawalTxId = withdrawalTxId;
+    if (depositAmount !== undefined) updateData.depositAmount = Number(depositAmount);
+    
+    // Update monitoring and completion flags based on status
+    if (status === 'processing') {
+      updateData.depositReceived = true;
+    } else if (status === 'completed') {
+      updateData.swapCompleted = true;
+      updateData.monitoringActive = false;
+    } else if (status === 'failed' || status === 'expired') {
+      updateData.monitoringActive = false;
+    }
+    
     const updated = await ExchangeHistory.findOneAndUpdate(
       { exchangeId },
-      { status: String(status) },
+      updateData,
       { new: true }
     );
     if (!updated) return res.status(404).json({ message: 'Exchange not found' });

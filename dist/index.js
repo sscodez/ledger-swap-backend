@@ -32,6 +32,9 @@ const swagger_1 = __importDefault(require("./config/swagger"));
 const cors_1 = __importDefault(require("cors"));
 const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
 const cryptoRoutes_1 = __importDefault(require("./routes/cryptoRoutes"));
+const blogRoutes_1 = __importDefault(require("./routes/blogRoutes"));
+const kucoinRoutes_1 = __importDefault(require("./routes/kucoinRoutes"));
+const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -97,11 +100,26 @@ app.use('/api/admin/management', tokenChainRoutes_1.default);
 app.use('/api/disputes', disputesRoutes_1.default);
 app.use('/api/upload', uploadRoutes_1.default);
 app.use('/api/crypto', cryptoRoutes_1.default);
+app.use('/api/blogs', blogRoutes_1.default);
+app.use('/api/kucoin', kucoinRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             yield (0, db_1.default)();
-            app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+            // Start the server
+            app.listen(PORT, () => {
+                console.log(`Server running on port ${PORT}`);
+                // Start KuCoin monitoring service after server is running
+                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                    try {
+                        console.log('🚀 Starting KuCoin monitoring service...');
+                        yield kucoinMonitoringService_1.default.start();
+                    }
+                    catch (error) {
+                        console.error('❌ Failed to start KuCoin monitoring service:', error.message);
+                    }
+                }), 5000); // Wait 5 seconds for server to fully initialize
+            });
         }
         catch (err) {
             console.error('Failed to start server:', err);
@@ -115,5 +133,16 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
+});
+// Graceful shutdown
+process.on('SIGINT', () => {
+    console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+    kucoinMonitoringService_1.default.stop();
+    process.exit(0);
+});
+process.on('SIGTERM', () => {
+    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+    kucoinMonitoringService_1.default.stop();
+    process.exit(0);
 });
 start();

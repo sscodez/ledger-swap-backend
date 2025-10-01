@@ -19,6 +19,8 @@ import cors from 'cors';
 import uploadRoutes from './routes/uploadRoutes';
 import cryptoRoutes from './routes/cryptoRoutes';
 import blogRoutes from './routes/blogRoutes';
+import kucoinRoutes from './routes/kucoinRoutes';
+import kucoinMonitoringService from './services/kucoinMonitoringService';
 
 dotenv.config();
 const app = express();
@@ -97,13 +99,28 @@ app.use('/api/disputes', disputesRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/blogs', blogRoutes);
+app.use('/api/kucoin', kucoinRoutes);
 
 
 
 async function start() {
   try {
     await connectDB();
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    
+    // Start the server
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+      
+      // Start KuCoin monitoring service after server is running
+      setTimeout(async () => {
+        try {
+          console.log('🚀 Starting KuCoin monitoring service...');
+          await kucoinMonitoringService.start();
+        } catch (error: any) {
+          console.error('❌ Failed to start KuCoin monitoring service:', error.message);
+        }
+      }, 5000); // Wait 5 seconds for server to fully initialize
+    });
   } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);
@@ -116,6 +133,19 @@ process.on('unhandledRejection', (reason) => {
 });
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  kucoinMonitoringService.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  kucoinMonitoringService.stop();
+  process.exit(0);
 });
 
 start();

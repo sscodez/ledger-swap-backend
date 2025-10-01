@@ -36,26 +36,44 @@ const adminFlagAddress = (req, res) => __awaiter(void 0, void 0, void 0, functio
         if (!coin || !network || !address) {
             return res.status(400).json({ message: 'coin, network, and address are required' });
         }
+        // Check if address is already flagged
+        const existingAddress = yield Address_1.default.findOne({ address: address.trim() });
+        if (existingAddress && existingAddress.flagged) {
+            return res.status(409).json({
+                message: 'This address is already flagged',
+                existing: {
+                    address: existingAddress.address,
+                    coin: existingAddress.coin,
+                    network: existingAddress.network,
+                    flaggedAt: existingAddress.flaggedAt,
+                    flaggedReason: existingAddress.flaggedReason
+                }
+            });
+        }
         const authReq = req;
         const now = new Date();
         const update = {
-            coin,
-            network,
-            address,
+            coin: coin.trim(),
+            network: network.trim(),
+            address: address.trim(),
             label: 'flagged',
             flagged: true,
             flaggedAt: now,
         };
-        if (reason)
-            update.flaggedReason = reason;
+        if (reason && reason.trim())
+            update.flaggedReason = reason.trim();
         // attach the admin user as creator/owner to satisfy schema requirement
         if ((_a = authReq.user) === null || _a === void 0 ? void 0 : _a._id)
             update.user = authReq.user._id;
         // Upsert by unique address
-        const doc = yield Address_1.default.findOneAndUpdate({ address }, { $set: update }, { new: true, upsert: true });
+        const doc = yield Address_1.default.findOneAndUpdate({ address: address.trim() }, { $set: update }, { new: true, upsert: true });
         res.status(201).json(doc);
     }
     catch (err) {
+        // Handle MongoDB duplicate key error
+        if (err.code === 11000) {
+            return res.status(409).json({ message: 'This address is already in the system' });
+        }
         res.status(500).json({ message: 'Failed to flag address', error: err.message });
     }
 });

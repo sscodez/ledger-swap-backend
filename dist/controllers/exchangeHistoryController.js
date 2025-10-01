@@ -42,8 +42,23 @@ exports.createExchangeHistory = createExchangeHistory;
 const getExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
     try {
-        const exchangeHistory = yield ExchangeHistory_1.default.find({ user: authReq.user._id });
-        res.json(exchangeHistory);
+        const { page = '1', limit = '10', sort = '-createdAt' } = req.query;
+        const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+        const limitNum = Math.max(Math.min(parseInt(limit, 10) || 10, 100), 1);
+        const [items, total] = yield Promise.all([
+            ExchangeHistory_1.default.find({ user: authReq.user._id })
+                .sort(sort)
+                .skip((pageNum - 1) * limitNum)
+                .limit(limitNum),
+            ExchangeHistory_1.default.countDocuments({ user: authReq.user._id }),
+        ]);
+        res.json({
+            page: pageNum,
+            limit: limitNum,
+            total,
+            pages: Math.ceil(total / limitNum),
+            items,
+        });
     }
     catch (error) {
         if (error instanceof Error) {

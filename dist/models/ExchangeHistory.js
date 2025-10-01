@@ -37,8 +37,9 @@ const mongoose_1 = __importStar(require("mongoose"));
 const exchangeHistorySchema = new mongoose_1.Schema({
     user: {
         type: mongoose_1.Schema.Types.ObjectId,
-        required: true,
+        required: false, // Allow null for anonymous exchanges
         ref: 'User',
+        default: null,
     },
     exchangeId: {
         type: String,
@@ -47,7 +48,7 @@ const exchangeHistorySchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['completed', 'pending', 'failed', 'in_review'],
+        enum: ['completed', 'pending', 'failed', 'in_review', 'expired', 'processing'],
         default: 'pending',
     },
     date: {
@@ -77,6 +78,53 @@ const exchangeHistorySchema = new mongoose_1.Schema({
     network: {
         type: String,
         index: true,
+    },
+    isAnonymous: {
+        type: Boolean,
+        default: false,
+        index: true, // Index for filtering anonymous vs authenticated exchanges
+    },
+    // KuCoin Integration Fields
+    kucoinDepositAddress: {
+        type: String,
+        index: true, // Index for quick lookup by deposit address
+    },
+    kucoinDepositCurrency: {
+        type: String,
+        index: true,
+    },
+    kucoinOrderId: {
+        type: String,
+        index: true,
+    },
+    depositReceived: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    depositAmount: {
+        type: Number,
+    },
+    depositTxId: {
+        type: String,
+        index: true,
+    },
+    swapCompleted: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    withdrawalTxId: {
+        type: String,
+    },
+    expiresAt: {
+        type: Date,
+        index: true, // Index for efficient expiration queries
+    },
+    monitoringActive: {
+        type: Boolean,
+        default: true,
+        index: true, // Index for filtering active monitoring
     },
 }, {
     timestamps: true,
