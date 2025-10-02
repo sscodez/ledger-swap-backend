@@ -74,8 +74,18 @@ async function kucoinRequest(method: string, endpoint: string, params: any = {},
  */
 async function getOrCreateDepositAddress(currency: string, chain: string): Promise<any> {
   try {
+    console.log(`🔍 Getting deposit address for ${currency} on ${chain} chain`);
+    
+    // Check API credentials first
+    if (!API_KEY || !API_SECRET || !API_PASSPHRASE) {
+      throw new Error('KuCoin API credentials not configured');
+    }
+    
     // First try to get existing addresses
-    const existingRes = await kucoinRequest('GET', '/api/v3/deposit-addresses', { currency });
+    console.log(`📋 Checking existing addresses for ${currency}...`);
+    const existingRes = await kucoinRequest('GET', '/api/v1/deposit-addresses', { currency });
+    
+    console.log(`📊 Existing addresses response:`, existingRes);
     
     if (existingRes.data && existingRes.data.length > 0) {
       const chainAddress = existingRes.data.find((addr: any) => addr.chain === chain);
@@ -86,18 +96,24 @@ async function getOrCreateDepositAddress(currency: string, chain: string): Promi
     }
     
     // Create new address if none exists
+    console.log(`🏗️ Creating new deposit address for ${currency} on ${chain}...`);
     const body = { currency, chain, to: 'MAIN' };
-    const createRes = await kucoinRequest('POST', '/api/v3/deposit-address/create', {}, body);
+    console.log(`📤 Create address request body:`, body);
+    
+    const createRes = await kucoinRequest('POST', '/api/v1/deposit-addresses', {}, body);
+    
+    console.log(`📥 Create address response:`, createRes);
     
     if (createRes.code !== '200000') {
-      console.error('Create deposit address failed:', createRes);
+      console.error('❌ Create deposit address failed:', createRes);
       return null;
     }
     
     console.log(`✅ New ${currency} (${chain}) address created:`, createRes.data.address);
     return createRes.data;
   } catch (error: any) {
-    console.error('Error with deposit address:', error.message);
+    console.error('❌ Error with deposit address:', error.message);
+    console.error('❌ Full error stack:', error);
     return null;
   }
 }

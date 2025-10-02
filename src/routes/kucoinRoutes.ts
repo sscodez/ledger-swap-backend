@@ -2,7 +2,7 @@ import express from 'express';
 import kucoinMonitoringService from '../services/kucoinMonitoringService';
 import { protect } from '../middleware/authMiddleware';
 import ExchangeHistory from '../models/ExchangeHistory';
-import { initializeDepositAddresses, SUPPORTED_CHAINS } from '../utils/kucoin';
+import { initializeDepositAddresses, SUPPORTED_CHAINS, getOrCreateDepositAddress } from '../utils/kucoin';
 
 const router = express.Router();
 
@@ -189,6 +189,99 @@ router.get('/supported-currencies', (req, res) => {
     currencies: Object.keys(SUPPORTED_CHAINS),
     chains: SUPPORTED_CHAINS
   });
+});
+
+/**
+ * GET /api/kucoin/test-connection
+ * Test KuCoin API connection (admin only)
+ */
+router.get('/test-connection', protect, async (req, res) => {
+  try {
+    console.log('🧪 Testing KuCoin API connection...');
+    
+    // Check environment variables
+    const hasCredentials = !!(process.env.KUCOIN_API_KEY && process.env.KUCOIN_API_SECRET && process.env.KUCOIN_API_PASSPHRASE);
+    
+    console.log('🔑 API Credentials check:', {
+      hasApiKey: !!process.env.KUCOIN_API_KEY,
+      hasApiSecret: !!process.env.KUCOIN_API_SECRET,
+      hasPassphrase: !!process.env.KUCOIN_API_PASSPHRASE,
+      apiKeyLength: process.env.KUCOIN_API_KEY?.length || 0
+    });
+    
+    if (!hasCredentials) {
+      return res.status(400).json({
+        message: 'KuCoin API credentials not configured',
+        missing: {
+          apiKey: !process.env.KUCOIN_API_KEY,
+          apiSecret: !process.env.KUCOIN_API_SECRET,
+          passphrase: !process.env.KUCOIN_API_PASSPHRASE
+        }
+      });
+    }
+    
+    // Test basic API call - get account info
+    const { kucoinRequest } = require('../utils/kucoin');
+    const accountInfo = await kucoinRequest('GET', '/api/v1/accounts');
+    
+    res.json({
+      message: 'KuCoin API connection successful',
+      hasCredentials,
+      accountsCount: accountInfo?.data?.length || 0,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error: any) {
+    console.error('❌ KuCoin connection test failed:', error);
+    res.status(500).json({
+      message: 'KuCoin API connection failed',
+      error: error.message,
+      details: error.response?.data || null
+    });
+  }
+});
+
+/**
+ * POST /api/kucoin/test-deposit-address
+ * Test deposit address generation (admin only)
+ */
+router.post('/test-deposit-address', protect, async (req, res) => {
+  try {
+    const { currency, chain } = req.body;
+    
+    if (!currency || !chain) {
+      return res.status(400).json({ 
+        message: 'Currency and chain are required',
+        example: { currency: 'BTC', chain: 'btc' }
+      });
+    }
+    
+    console.log(`🧪 Testing deposit address generation for ${currency} on ${chain}`);
+    
+    const result = await getOrCreateDepositAddress(currency, chain);
+    
+    if (result) {
+      res.json({
+        message: 'Deposit address generated successfully',
+        address: result.address,
+        currency: result.currency,
+        chain: result.chain,
+        result
+      });
+    } else {
+      res.status(500).json({
+        message: 'Failed to generate deposit address',
+        currency,
+        chain
+      });
+    }
+  } catch (error: any) {
+    console.error('❌ Test deposit address error:', error);
+    res.status(500).json({ 
+      message: 'Error testing deposit address generation', 
+      error: error.message 
+    });
+  }
 });
 
 export default router;

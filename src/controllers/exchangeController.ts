@@ -55,21 +55,36 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
     let kucoinDepositCurrency = null;
     
     const fromCurrencyUpper = String(fromCurrency).toUpperCase();
+    console.log(`🔍 Checking currency support for: ${fromCurrencyUpper}`);
+    console.log(`📋 Supported chains:`, Object.keys(SUPPORTED_CHAINS));
+    
     if (SUPPORTED_CHAINS[fromCurrencyUpper as keyof typeof SUPPORTED_CHAINS]) {
       const chainConfig = SUPPORTED_CHAINS[fromCurrencyUpper as keyof typeof SUPPORTED_CHAINS];
       console.log(`🏦 Generating deposit address for ${fromCurrencyUpper}...`);
+      console.log(`⚙️ Chain config:`, chainConfig);
       
-      try {
-        const depositAddressResult = await getOrCreateDepositAddress(chainConfig.currency, chainConfig.chain);
-        if (depositAddressResult && depositAddressResult.address) {
-          kucoinDepositAddress = depositAddressResult.address;
-          kucoinDepositCurrency = chainConfig.currency;
-          console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
+      // Check if KuCoin API credentials are available
+      if (!process.env.KUCOIN_API_KEY || !process.env.KUCOIN_API_SECRET || !process.env.KUCOIN_API_PASSPHRASE) {
+        console.error('❌ KuCoin API credentials not configured');
+        console.log('⚠️ Continuing without deposit address generation');
+      } else {
+        try {
+          const depositAddressResult = await getOrCreateDepositAddress(chainConfig.currency, chainConfig.chain);
+          if (depositAddressResult && depositAddressResult.address) {
+            kucoinDepositAddress = depositAddressResult.address;
+            kucoinDepositCurrency = chainConfig.currency;
+            console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
+          } else {
+            console.log('⚠️ No address returned from KuCoin API');
+          }
+        } catch (depositError: any) {
+          console.error('❌ Failed to generate deposit address:', depositError.message);
+          console.error('❌ Full error:', depositError);
+          // Continue without deposit address - can be generated later
         }
-      } catch (depositError: any) {
-        console.error('❌ Failed to generate deposit address:', depositError.message);
-        // Continue without deposit address - can be generated later
       }
+    } else {
+      console.log(`ℹ️ Currency ${fromCurrencyUpper} not supported by KuCoin integration`);
     }
 
     // Set expiration time (5 minutes from now)
