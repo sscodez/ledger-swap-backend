@@ -64,7 +64,6 @@ const options: swaggerJSDoc.Options = {
         get: {
           summary: 'Test KuCoin API connection',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'KuCoin API connection successful',
@@ -113,7 +112,6 @@ const options: swaggerJSDoc.Options = {
         post: {
           summary: 'Test deposit address generation',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           requestBody: {
             required: true,
             content: {
@@ -168,7 +166,6 @@ const options: swaggerJSDoc.Options = {
         get: {
           summary: 'Get KuCoin monitoring service status',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'Service status retrieved successfully',
@@ -197,7 +194,6 @@ const options: swaggerJSDoc.Options = {
         post: {
           summary: 'Start KuCoin monitoring service',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'KuCoin monitoring service started successfully',
@@ -223,7 +219,6 @@ const options: swaggerJSDoc.Options = {
         post: {
           summary: 'Stop KuCoin monitoring service',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'KuCoin monitoring service stopped successfully',
@@ -249,7 +244,6 @@ const options: swaggerJSDoc.Options = {
         get: {
           summary: 'Get all deposit addresses',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'Deposit addresses retrieved successfully',
@@ -276,7 +270,6 @@ const options: swaggerJSDoc.Options = {
         get: {
           summary: 'Get active exchanges being monitored',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'Active exchanges retrieved successfully',
@@ -316,7 +309,6 @@ const options: swaggerJSDoc.Options = {
         get: {
           summary: 'Get expired exchanges',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           responses: {
             '200': {
               description: 'Expired exchanges retrieved successfully',
@@ -353,7 +345,6 @@ const options: swaggerJSDoc.Options = {
         post: {
           summary: 'Retry a failed exchange',
           tags: ['KuCoin'],
-          security: [{ bearerAuth: [] }],
           parameters: [
             {
               name: 'exchangeId',
