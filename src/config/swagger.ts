@@ -384,6 +384,89 @@ const options: swaggerJSDoc.Options = {
           }
         }
       },
+      '/api/kucoin/create-deposit-address': {
+        post: {
+          summary: 'Create a single deposit address for specified currency and chain',
+          tags: ['KuCoin'],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['currency', 'chain'],
+                  properties: {
+                    currency: {
+                      type: 'string',
+                      enum: ['BTC', 'XRP', 'XLM', 'XDC', 'IOTA'],
+                      example: 'BTC',
+                      description: 'Currency code'
+                    },
+                    chain: {
+                      type: 'string',
+                      enum: ['btc', 'xrp', 'xlm', 'xdc', 'iota'],
+                      example: 'btc',
+                      description: 'Chain identifier'
+                    },
+                    to: {
+                      type: 'string',
+                      enum: ['main', 'trade'],
+                      default: 'main',
+                      description: 'Deposit account type'
+                    }
+                  }
+                }
+              }
+            }
+          },
+          responses: {
+            '200': {
+              description: 'Deposit address created successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      message: { type: 'string' },
+                      data: {
+                        type: 'object',
+                        properties: {
+                          address: { type: 'string', description: 'Deposit address' },
+                          memo: { type: 'string', description: 'Address memo/tag (if required)' },
+                          chainId: { type: 'string', description: 'Chain identifier' },
+                          to: { type: 'string', description: 'Account type' },
+                          expirationDate: { type: 'integer', description: 'Expiration timestamp' },
+                          currency: { type: 'string', description: 'Currency code' },
+                          chainName: { type: 'string', description: 'Chain name' }
+                        }
+                      },
+                      kucoinResponse: { type: 'object', description: 'Raw KuCoin API response' }
+                    }
+                  }
+                }
+              }
+            },
+            '400': {
+              description: 'Invalid request parameters',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      message: { type: 'string' },
+                      example: { type: 'object' },
+                      supportedChains: { type: 'object' }
+                    }
+                  }
+                }
+              }
+            },
+            '500': {
+              description: 'Failed to create deposit address'
+            }
+          }
+        }
+      },
       '/api/kucoin/create-all-addresses': {
         post: {
           summary: 'Create deposit addresses for all supported currencies',

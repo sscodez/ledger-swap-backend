@@ -179,6 +179,61 @@ router.post('/exchanges/:exchangeId/retry', async (req, res) => {
 });
 
 /**
+ * POST /api/kucoin/create-deposit-address
+ * Create a single deposit address for specified currency and chain
+ */
+router.post('/create-deposit-address', async (req, res) => {
+  try {
+    const { currency, chain, to = 'main' } = req.body;
+    
+    if (!currency || !chain) {
+      return res.status(400).json({
+        message: 'Currency and chain are required',
+        example: {
+          currency: 'BTC',
+          chain: 'btc',
+          to: 'main'
+        },
+        supportedChains: SUPPORTED_CHAINS
+      });
+    }
+    
+    console.log(`🏗️ Creating deposit address for ${currency} on ${chain} chain...`);
+    
+    const result = await getOrCreateDepositAddress(currency, chain);
+    
+    if (result) {
+      res.json({
+        message: 'Deposit address created successfully',
+        data: {
+          address: result.address,
+          memo: result.memo || '',
+          chainId: result.chain || chain,
+          to: to.toUpperCase(),
+          expirationDate: 0,
+          currency: currency,
+          chainName: currency
+        },
+        kucoinResponse: result
+      });
+    } else {
+      res.status(500).json({
+        message: 'Failed to create deposit address',
+        currency,
+        chain
+      });
+    }
+  } catch (error: any) {
+    console.error('❌ Create deposit address error:', error);
+    res.status(500).json({
+      message: 'Error creating deposit address',
+      error: error.message,
+      details: error.response?.data || null
+    });
+  }
+});
+
+/**
  * POST /api/kucoin/create-all-addresses
  * Create deposit addresses for all supported currencies
  */
