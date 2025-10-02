@@ -174,14 +174,47 @@ router.post('/exchanges/:exchangeId/retry', async (req, res) => {
   } catch (error: any) {
     res.status(500).json({ 
       message: 'Failed to retry exchange', 
-      error: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/kucoin/create-all-addresses
+ * Create deposit addresses for all supported currencies
+ */
+router.post('/create-all-addresses', async (req, res) => {
+  try {
+    console.log('🚀 Starting bulk deposit address creation...');
+    
+    const addresses = await initializeDepositAddresses();
+    
+    const successful = Object.keys(addresses).filter(k => addresses[k].address);
+    const failed = Object.keys(addresses).filter(k => addresses[k].error);
+    
+    res.json({
+      message: 'Deposit address creation completed',
+      summary: {
+        total: Object.keys(SUPPORTED_CHAINS).length,
+        successful: successful.length,
+        failed: failed.length,
+        successfulCurrencies: successful,
+        failedCurrencies: failed
+      },
+      addresses,
+      supportedChains: SUPPORTED_CHAINS
+    });
+  } catch (error: any) {
+    console.error('❌ Bulk address creation failed:', error);
+    res.status(500).json({
+      message: 'Failed to create deposit addresses',
+      error: error.message
     });
   }
 });
 
 /**
  * GET /api/kucoin/supported-currencies
- * Get supported currencies for KuCoin integration (public)
+ * Get supported currencies for KuCoin integration
  */
 router.get('/supported-currencies', (req, res) => {
   res.json({

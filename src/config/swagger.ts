@@ -384,6 +384,48 @@ const options: swaggerJSDoc.Options = {
           }
         }
       },
+      '/api/kucoin/create-all-addresses': {
+        post: {
+          summary: 'Create deposit addresses for all supported currencies',
+          tags: ['KuCoin'],
+          responses: {
+            '200': {
+              description: 'Deposit addresses created successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      message: { type: 'string' },
+                      summary: {
+                        type: 'object',
+                        properties: {
+                          total: { type: 'number' },
+                          successful: { type: 'number' },
+                          failed: { type: 'number' },
+                          successfulCurrencies: {
+                            type: 'array',
+                            items: { type: 'string' }
+                          },
+                          failedCurrencies: {
+                            type: 'array',
+                            items: { type: 'string' }
+                          }
+                        }
+                      },
+                      addresses: { type: 'object' },
+                      supportedChains: { type: 'object' }
+                    }
+                  }
+                }
+              }
+            },
+            '500': {
+              description: 'Failed to create deposit addresses'
+            }
+          }
+        }
+      },
       '/api/kucoin/supported-currencies': {
         get: {
           summary: 'Get supported currencies for KuCoin integration',
