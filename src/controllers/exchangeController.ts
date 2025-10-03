@@ -13,14 +13,17 @@ function generateExchangeId() {
 // Now supports both authenticated and anonymous users
 export const createExchange: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status } = req.body || {};
+  const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous } = req.body || {};
 
   if (!fromCurrency || !toCurrency) {
     return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
   }
 
-  // Check if user or recipient address is flagged (only if user is authenticated)
-  if (authReq.user) {
+  // Determine if this should be an anonymous exchange
+  const shouldBeAnonymous = isAnonymous || !authReq.user;
+
+  // Check if user or recipient address is flagged (only for authenticated users)
+  if (authReq.user && !shouldBeAnonymous) {
     try {
       const flaggedCheck = await checkComprehensiveFlagged(
         authReq.user._id.toString(),
@@ -91,7 +94,8 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     const record = await ExchangeHistory.create({
-      user: authReq.user ? authReq.user._id : null, // Allow null for anonymous exchanges
+      user: shouldBeAnonymous ? null : authReq.user!._id,
+      isAnonymous: shouldBeAnonymous,
       exchangeId,
       status: computedStatus,
       from: {
@@ -105,7 +109,6 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       fees: Number(fees ?? 0),
       cashback: Number(cashback ?? 0),
       walletAddress: walletAddress ? String(walletAddress) : undefined,
-      isAnonymous: !authReq.user, // Track if this is an anonymous exchange
       
       // KuCoin Integration Fields
       kucoinDepositAddress,
