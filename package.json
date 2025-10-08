@@ -10,7 +10,8 @@
     "vercel-build": "npm run build",
     "prestart": "npm run build",
     "seed:admin": "ts-node-dev --transpile-only src/scripts/seedAdmin.ts",
-    "seed:users": "ts-node-dev --transpile-only src/scripts/seedUsers.ts"
+    "seed:users": "ts-node-dev --transpile-only src/scripts/seedUsers.ts",
+    "seed:crypto-fees": "ts-node-dev --transpile-only src/scripts/seedCryptoFees.ts"
   },
   "keywords": [],
   "author": "",

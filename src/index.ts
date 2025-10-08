@@ -20,6 +20,7 @@ import uploadRoutes from './routes/uploadRoutes';
 import cryptoRoutes from './routes/cryptoRoutes';
 import blogRoutes from './routes/blogRoutes';
 import kucoinRoutes from './routes/kucoinRoutes';
+import cryptoFeeRoutes from './routes/cryptoFeeRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
 
 dotenv.config();
@@ -117,6 +118,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/blogs', blogRoutes);
 app.use('/api/kucoin', kucoinRoutes);
+app.use('/api/crypto-fees', cryptoFeeRoutes);
 
 
 
