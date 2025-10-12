@@ -35,6 +35,8 @@ const cryptoRoutes_1 = __importDefault(require("./routes/cryptoRoutes"));
 const blogRoutes_1 = __importDefault(require("./routes/blogRoutes"));
 const kucoinRoutes_1 = __importDefault(require("./routes/kucoinRoutes"));
 const cryptoFeeRoutes_1 = __importDefault(require("./routes/cryptoFeeRoutes"));
+const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
+const tradingRoutes_1 = __importDefault(require("./routes/tradingRoutes"));
 const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
@@ -122,6 +124,8 @@ app.use('/api/crypto', cryptoRoutes_1.default);
 app.use('/api/blogs', blogRoutes_1.default);
 app.use('/api/kucoin', kucoinRoutes_1.default);
 app.use('/api/crypto-fees', cryptoFeeRoutes_1.default);
+app.use('/api/contacts', contactRoutes_1.default);
+app.use('/api/trading', tradingRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

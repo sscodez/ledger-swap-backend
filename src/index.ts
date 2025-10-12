@@ -22,6 +22,7 @@ import blogRoutes from './routes/blogRoutes';
 import kucoinRoutes from './routes/kucoinRoutes';
 import cryptoFeeRoutes from './routes/cryptoFeeRoutes';
 import contactRoutes from './routes/contactRoutes';
+import tradingRoutes from './routes/tradingRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
 
 dotenv.config();
@@ -121,8 +122,7 @@ app.use('/api/blogs', blogRoutes);
 app.use('/api/kucoin', kucoinRoutes);
 app.use('/api/crypto-fees', cryptoFeeRoutes);
 app.use('/api/contacts', contactRoutes);
-
-
+app.use('/api/trading', tradingRoutes);
 
 async function start() {
   try {

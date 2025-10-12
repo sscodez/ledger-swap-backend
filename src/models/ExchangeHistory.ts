@@ -24,6 +24,8 @@ export interface IExchangeHistory extends Document {
   withdrawalTxId?: string; // Transaction ID of the withdrawal
   expiresAt?: Date; // When this exchange expires (5 minutes from creation)
   monitoringActive?: boolean; // Whether this exchange is being monitored
+  createdAt: Date; // Added by timestamps: true
+  updatedAt: Date; // Added by timestamps: true
 }
 
 const exchangeHistorySchema: Schema = new Schema({
