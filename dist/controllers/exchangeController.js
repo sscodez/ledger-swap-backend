@@ -24,12 +24,14 @@ function generateExchangeId() {
 // Now supports both authenticated and anonymous users
 const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
-    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status } = req.body || {};
+    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous } = req.body || {};
     if (!fromCurrency || !toCurrency) {
         return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
     }
-    // Check if user or recipient address is flagged (only if user is authenticated)
-    if (authReq.user) {
+    // Determine if this should be an anonymous exchange
+    const shouldBeAnonymous = isAnonymous || !authReq.user;
+    // Check if user or recipient address is flagged (only for authenticated users)
+    if (authReq.user && !shouldBeAnonymous) {
         try {
             const flaggedCheck = yield (0, flaggedCheck_1.checkComprehensiveFlagged)(authReq.user._id.toString(), walletAddress);
             if (flaggedCheck.isFlagged) {
@@ -58,26 +60,44 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
         let kucoinDepositAddress = null;
         let kucoinDepositCurrency = null;
         const fromCurrencyUpper = String(fromCurrency).toUpperCase();
+        console.log(`🔍 Checking currency support for: ${fromCurrencyUpper}`);
+        console.log(`📋 Supported chains:`, Object.keys(kucoin_1.SUPPORTED_CHAINS));
         if (kucoin_1.SUPPORTED_CHAINS[fromCurrencyUpper]) {
             const chainConfig = kucoin_1.SUPPORTED_CHAINS[fromCurrencyUpper];
             console.log(`🏦 Generating deposit address for ${fromCurrencyUpper}...`);
-            try {
-                const depositAddressResult = yield (0, kucoin_1.getOrCreateDepositAddress)(chainConfig.currency, chainConfig.chain);
-                if (depositAddressResult && depositAddressResult.address) {
-                    kucoinDepositAddress = depositAddressResult.address;
-                    kucoinDepositCurrency = chainConfig.currency;
-                    console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
+            console.log(`⚙️ Chain config:`, chainConfig);
+            // Check if KuCoin API credentials are available
+            if (!process.env.KUCOIN_API_KEY || !process.env.KUCOIN_API_SECRET || !process.env.KUCOIN_API_PASSPHRASE) {
+                console.error('❌ KuCoin API credentials not configured');
+                console.log('⚠️ Continuing without deposit address generation');
+            }
+            else {
+                try {
+                    const depositAddressResult = yield (0, kucoin_1.getOrCreateDepositAddress)(chainConfig.currency, chainConfig.chain);
+                    if (depositAddressResult && depositAddressResult.address) {
+                        kucoinDepositAddress = depositAddressResult.address;
+                        kucoinDepositCurrency = chainConfig.currency;
+                        console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
+                    }
+                    else {
+                        console.log('⚠️ No address returned from KuCoin API');
+                    }
+                }
+                catch (depositError) {
+                    console.error('❌ Failed to generate deposit address:', depositError.message);
+                    console.error('❌ Full error:', depositError);
+                    // Continue without deposit address - can be generated later
                 }
             }
-            catch (depositError) {
-                console.error('❌ Failed to generate deposit address:', depositError.message);
-                // Continue without deposit address - can be generated later
-            }
+        }
+        else {
+            console.log(`ℹ️ Currency ${fromCurrencyUpper} not supported by KuCoin integration`);
         }
         // Set expiration time (5 minutes from now)
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         const record = yield ExchangeHistory_1.default.create({
-            user: authReq.user ? authReq.user._id : null, // Allow null for anonymous exchanges
+            user: shouldBeAnonymous ? null : authReq.user._id,
+            isAnonymous: shouldBeAnonymous,
             exchangeId,
             status: computedStatus,
             from: {
@@ -91,7 +111,6 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             fees: Number(fees !== null && fees !== void 0 ? fees : 0),
             cashback: Number(cashback !== null && cashback !== void 0 ? cashback : 0),
             walletAddress: walletAddress ? String(walletAddress) : undefined,
-            isAnonymous: !authReq.user, // Track if this is an anonymous exchange
             // KuCoin Integration Fields
             kucoinDepositAddress,
             kucoinDepositCurrency,

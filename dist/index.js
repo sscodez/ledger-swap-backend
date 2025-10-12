@@ -34,15 +34,34 @@ const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
 const cryptoRoutes_1 = __importDefault(require("./routes/cryptoRoutes"));
 const blogRoutes_1 = __importDefault(require("./routes/blogRoutes"));
 const kucoinRoutes_1 = __importDefault(require("./routes/kucoinRoutes"));
+const cryptoFeeRoutes_1 = __importDefault(require("./routes/cryptoFeeRoutes"));
 const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
 app.use(passport_1.default.initialize());
-// CORS: allow frontend origin
+// CORS: allow frontend origins
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+const allowedOrigins = [
+    FRONTEND_URL,
+    'https://ledgerswap.io',
+    'https://www.ledgerswap.io',
+    'http://localhost:3000',
+    'http://localhost:3001'
+];
 app.use((0, cors_1.default)({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        }
+        else {
+            console.log('CORS blocked origin:', origin);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -102,6 +121,7 @@ app.use('/api/upload', uploadRoutes_1.default);
 app.use('/api/crypto', cryptoRoutes_1.default);
 app.use('/api/blogs', blogRoutes_1.default);
 app.use('/api/kucoin', kucoinRoutes_1.default);
+app.use('/api/crypto-fees', cryptoFeeRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

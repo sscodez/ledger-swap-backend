@@ -63,6 +63,513 @@ const options = {
                         }
                     }
                 }
+            },
+            '/api/kucoin/test-connection': {
+                get: {
+                    summary: 'Test KuCoin API connection',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'KuCoin API connection successful',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            hasCredentials: { type: 'boolean' },
+                                            accountsCount: { type: 'number' },
+                                            timestamp: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '400': {
+                            description: 'KuCoin API credentials not configured',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            missing: {
+                                                type: 'object',
+                                                properties: {
+                                                    apiKey: { type: 'boolean' },
+                                                    apiSecret: { type: 'boolean' },
+                                                    passphrase: { type: 'boolean' }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'KuCoin API connection failed'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/test-deposit-address': {
+                post: {
+                    summary: 'Test deposit address generation',
+                    tags: ['KuCoin'],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['currency', 'chain'],
+                                    properties: {
+                                        currency: {
+                                            type: 'string',
+                                            enum: ['BTC', 'XRP', 'XLM', 'XDC'],
+                                            example: 'BTC'
+                                        },
+                                        chain: {
+                                            type: 'string',
+                                            enum: ['btc', 'xrp', 'xlm', 'xdc'],
+                                            example: 'btc'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Deposit address generated successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            address: { type: 'string' },
+                                            currency: { type: 'string' },
+                                            chain: { type: 'string' },
+                                            result: { type: 'object' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '400': {
+                            description: 'Invalid request parameters'
+                        },
+                        '500': {
+                            description: 'Failed to generate deposit address'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/status': {
+                get: {
+                    summary: 'Get KuCoin monitoring service status',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Service status retrieved successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            isRunning: { type: 'boolean' },
+                                            activeExchanges: { type: 'number' },
+                                            totalProcessed: { type: 'number' },
+                                            lastCheck: { type: 'string' },
+                                            uptime: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to get service status'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/start': {
+                post: {
+                    summary: 'Start KuCoin monitoring service',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'KuCoin monitoring service started successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            status: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to start monitoring service'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/stop': {
+                post: {
+                    summary: 'Stop KuCoin monitoring service',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'KuCoin monitoring service stopped successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            status: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to stop monitoring service'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/addresses': {
+                get: {
+                    summary: 'Get all deposit addresses',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Deposit addresses retrieved successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            addresses: { type: 'object' },
+                                            supportedChains: { type: 'object' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to get deposit addresses'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/exchanges/active': {
+                get: {
+                    summary: 'Get active exchanges being monitored',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Active exchanges retrieved successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            count: { type: 'number' },
+                                            exchanges: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'object',
+                                                    properties: {
+                                                        exchangeId: { type: 'string' },
+                                                        status: { type: 'string' },
+                                                        kucoinDepositAddress: { type: 'string' },
+                                                        from: { type: 'object' },
+                                                        to: { type: 'object' },
+                                                        expiresAt: { type: 'string' }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to get active exchanges'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/exchanges/expired': {
+                get: {
+                    summary: 'Get expired exchanges',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Expired exchanges retrieved successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            count: { type: 'number' },
+                                            exchanges: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'object',
+                                                    properties: {
+                                                        exchangeId: { type: 'string' },
+                                                        status: { type: 'string' },
+                                                        expiresAt: { type: 'string' }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to get expired exchanges'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/exchanges/{exchangeId}/retry': {
+                post: {
+                    summary: 'Retry a failed exchange',
+                    tags: ['KuCoin'],
+                    parameters: [
+                        {
+                            name: 'exchangeId',
+                            in: 'path',
+                            required: true,
+                            schema: {
+                                type: 'string'
+                            },
+                            description: 'Exchange ID to retry'
+                        }
+                    ],
+                    responses: {
+                        '200': {
+                            description: 'Exchange retry initiated successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            exchangeId: { type: 'string' },
+                                            newStatus: { type: 'string' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '400': {
+                            description: 'Exchange cannot be retried'
+                        },
+                        '404': {
+                            description: 'Exchange not found'
+                        },
+                        '500': {
+                            description: 'Failed to retry exchange'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/create-deposit-address': {
+                post: {
+                    summary: 'Create a single deposit address for specified currency and chain',
+                    tags: ['KuCoin'],
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['currency', 'chain'],
+                                    properties: {
+                                        currency: {
+                                            type: 'string',
+                                            enum: ['BTC', 'XRP', 'XLM', 'XDC', 'IOTA'],
+                                            example: 'BTC',
+                                            description: 'Currency code'
+                                        },
+                                        chain: {
+                                            type: 'string',
+                                            enum: ['btc', 'xrp', 'xlm', 'xdc', 'iota'],
+                                            example: 'btc',
+                                            description: 'Chain identifier'
+                                        },
+                                        to: {
+                                            type: 'string',
+                                            enum: ['main', 'trade'],
+                                            default: 'main',
+                                            description: 'Deposit account type'
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    responses: {
+                        '200': {
+                            description: 'Deposit address created successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            data: {
+                                                type: 'object',
+                                                properties: {
+                                                    address: { type: 'string', description: 'Deposit address' },
+                                                    memo: { type: 'string', description: 'Address memo/tag (if required)' },
+                                                    chainId: { type: 'string', description: 'Chain identifier' },
+                                                    to: { type: 'string', description: 'Account type' },
+                                                    expirationDate: { type: 'integer', description: 'Expiration timestamp' },
+                                                    currency: { type: 'string', description: 'Currency code' },
+                                                    chainName: { type: 'string', description: 'Chain name' }
+                                                }
+                                            },
+                                            kucoinResponse: { type: 'object', description: 'Raw KuCoin API response' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '400': {
+                            description: 'Invalid request parameters',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            example: { type: 'object' },
+                                            supportedChains: { type: 'object' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to create deposit address'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/create-all-addresses': {
+                post: {
+                    summary: 'Create deposit addresses for all supported currencies',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Deposit addresses created successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            summary: {
+                                                type: 'object',
+                                                properties: {
+                                                    total: { type: 'number' },
+                                                    successful: { type: 'number' },
+                                                    failed: { type: 'number' },
+                                                    successfulCurrencies: {
+                                                        type: 'array',
+                                                        items: { type: 'string' }
+                                                    },
+                                                    failedCurrencies: {
+                                                        type: 'array',
+                                                        items: { type: 'string' }
+                                                    }
+                                                }
+                                            },
+                                            addresses: { type: 'object' },
+                                            supportedChains: { type: 'object' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        '500': {
+                            description: 'Failed to create deposit addresses'
+                        }
+                    }
+                }
+            },
+            '/api/kucoin/supported-currencies': {
+                get: {
+                    summary: 'Get supported currencies for KuCoin integration',
+                    tags: ['KuCoin'],
+                    responses: {
+                        '200': {
+                            description: 'Supported currencies retrieved successfully',
+                            content: {
+                                'application/json': {
+                                    schema: {
+                                        type: 'object',
+                                        properties: {
+                                            message: { type: 'string' },
+                                            currencies: {
+                                                type: 'array',
+                                                items: { type: 'string' }
+                                            },
+                                            chains: {
+                                                type: 'object',
+                                                properties: {
+                                                    XDC: {
+                                                        type: 'object',
+                                                        properties: {
+                                                            currency: { type: 'string' },
+                                                            chain: { type: 'string' }
+                                                        }
+                                                    },
+                                                    BTC: {
+                                                        type: 'object',
+                                                        properties: {
+                                                            currency: { type: 'string' },
+                                                            chain: { type: 'string' }
+                                                        }
+                                                    },
+                                                    XLM: {
+                                                        type: 'object',
+                                                        properties: {
+                                                            currency: { type: 'string' },
+                                                            chain: { type: 'string' }
+                                                        }
+                                                    },
+                                                    XRP: {
+                                                        type: 'object',
+                                                        properties: {
+                                                            currency: { type: 'string' },
+                                                            chain: { type: 'string' }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     },

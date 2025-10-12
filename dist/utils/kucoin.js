@@ -31,9 +31,10 @@ const API_BASE = 'https://api.kucoin.com';
 // Supported chains configuration
 const SUPPORTED_CHAINS = {
     XDC: { currency: 'XDC', chain: 'xdc' },
-    BTC: { currency: 'BTC', chain: 'btc' },
-    XLM: { currency: 'XLM', chain: 'xlm' },
-    XRP: { currency: 'XRP', chain: 'xrp' }
+    BTC: { currency: 'BTC', chain: 'btc' }, // Native Bitcoin
+    XLM: { currency: 'XLM', chain: 'xlm' }, // Stellar Lumens
+    XRP: { currency: 'XRP', chain: 'xrp' }, // Ripple
+    IOTA: { currency: 'IOTA', chain: 'iota' } // IOTA
 };
 exports.SUPPORTED_CHAINS = SUPPORTED_CHAINS;
 // Store processed deposits to avoid duplicates
@@ -93,8 +94,15 @@ function kucoinRequest(method_1, endpoint_1) {
 function getOrCreateDepositAddress(currency, chain) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            console.log(`🔍 Getting deposit address for ${currency} on ${chain} chain`);
+            // Check API credentials first
+            if (!API_KEY || !API_SECRET || !API_PASSPHRASE) {
+                throw new Error('KuCoin API credentials not configured');
+            }
             // First try to get existing addresses
-            const existingRes = yield kucoinRequest('GET', '/api/v3/deposit-addresses', { currency });
+            console.log(`📋 Checking existing addresses for ${currency}...`);
+            const existingRes = yield kucoinRequest('GET', '/api/v1/deposit-addresses', { currency });
+            console.log(`📊 Existing addresses response:`, existingRes);
             if (existingRes.data && existingRes.data.length > 0) {
                 const chainAddress = existingRes.data.find((addr) => addr.chain === chain);
                 if (chainAddress) {
@@ -103,17 +111,21 @@ function getOrCreateDepositAddress(currency, chain) {
                 }
             }
             // Create new address if none exists
-            const body = { currency, chain, to: 'MAIN' };
+            console.log(`🏗️ Creating new deposit address for ${currency} on ${chain}...`);
+            const body = { currency, chain, to: 'main' };
+            console.log(`📤 Create address request body:`, body);
             const createRes = yield kucoinRequest('POST', '/api/v3/deposit-address/create', {}, body);
+            console.log(`📥 Create address response:`, createRes);
             if (createRes.code !== '200000') {
-                console.error('Create deposit address failed:', createRes);
+                console.error('❌ Create deposit address failed:', createRes);
                 return null;
             }
             console.log(`✅ New ${currency} (${chain}) address created:`, createRes.data.address);
             return createRes.data;
         }
         catch (error) {
-            console.error('Error with deposit address:', error.message);
+            console.error('❌ Error with deposit address:', error.message);
+            console.error('❌ Full error stack:', error);
             return null;
         }
     });
@@ -388,19 +400,43 @@ function processSwapOrder(deposit, targetCurrency, userOrderId, recipientAddress
  */
 function initializeDepositAddresses() {
     return __awaiter(this, void 0, void 0, function* () {
-        console.log('📍 Setting up deposit addresses...\n');
         const addresses = {};
-        for (const [key, config] of Object.entries(SUPPORTED_CHAINS)) {
-            const address = yield getOrCreateDepositAddress(config.currency, config.chain);
-            if (address) {
-                addresses[key] = address.address;
+        console.log('🚀 Initializing deposit addresses for all supported currencies...');
+        console.log('📋 Supported currencies:', Object.keys(SUPPORTED_CHAINS));
+        for (const [symbol, config] of Object.entries(SUPPORTED_CHAINS)) {
+            try {
+                console.log(`\n🔄 Initializing deposit address for ${symbol} (${config.currency} on ${config.chain})...`);
+                const address = yield getOrCreateDepositAddress(config.currency, config.chain);
+                if (address) {
+                    addresses[symbol] = {
+                        currency: config.currency,
+                        chain: config.chain,
+                        address: address.address,
+                        memo: address.memo || null,
+                        tag: address.tag || null,
+                        createdAt: new Date().toISOString()
+                    };
+                    console.log(`✅ ${symbol} address initialized: ${address.address}`);
+                    if (address.memo)
+                        console.log(`📝 ${symbol} memo: ${address.memo}`);
+                    if (address.tag)
+                        console.log(`🏷️ ${symbol} tag: ${address.tag}`);
+                }
+                else {
+                    console.log(`⚠️ Failed to get address for ${symbol}`);
+                    addresses[symbol] = { error: 'Failed to generate address' };
+                }
             }
-            yield new Promise(resolve => setTimeout(resolve, 1000)); // Rate limiting
+            catch (error) {
+                console.error(`❌ Error initializing ${symbol} address:`, error.message);
+                addresses[symbol] = { error: error.message };
+            }
+            // Add delay between requests to avoid rate limiting
+            yield new Promise(resolve => setTimeout(resolve, 1000));
         }
-        console.log('\n✅ Deposit addresses ready:');
-        for (const [key, address] of Object.entries(addresses)) {
-            console.log(`   ${key}: ${address}`);
-        }
+        console.log('\n📊 Deposit address initialization complete!');
+        console.log('✅ Successfully initialized:', Object.keys(addresses).filter(k => addresses[k].address).length);
+        console.log('❌ Failed to initialize:', Object.keys(addresses).filter(k => addresses[k].error).length);
         return addresses;
     });
 }

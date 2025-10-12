@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.isAdmin = exports.protect = void 0;
+exports.isAdmin = exports.optionalAuth = exports.protect = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const User_1 = __importDefault(require("../models/User"));
 const protect = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
@@ -38,6 +38,28 @@ const protect = (req, res, next) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.protect = protect;
+const optionalAuth = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    let token;
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        try {
+            token = req.headers.authorization.split(' ')[1];
+            const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
+            const authReq = req;
+            authReq.user = (yield User_1.default.findById(decoded.id).select('-password'));
+            // If user not found, continue without user (anonymous)
+            if (!authReq.user) {
+                console.log('Token provided but user not found, continuing as anonymous');
+            }
+        }
+        catch (error) {
+            console.log('Token verification failed, continuing as anonymous:', error);
+            // Continue without user (anonymous access)
+        }
+    }
+    // Always continue, whether authenticated or anonymous
+    next();
+});
+exports.optionalAuth = optionalAuth;
 const isAdmin = (req, res, next) => {
     const authReq = req;
     if (authReq.user && authReq.user.role === 'admin') {
