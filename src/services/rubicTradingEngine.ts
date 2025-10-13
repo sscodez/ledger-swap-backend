@@ -39,12 +39,6 @@ export class RubicTradingEngine implements ITradingEngine {
             'https://bsc-dataseed.binance.org/'
           ]
         }
-      },
-      walletProvider: {
-        [CHAIN_TYPE.EVM]: {
-          address: '0x0000000000000000000000000000000000000000',
-          chainId: 1
-        }
       }
     };
   }
