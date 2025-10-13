@@ -11,6 +11,9 @@ export interface ICryptoFee extends Document {
   depositAddress?: string;
   depositMemo?: string; // For currencies like XRP, XLM that need memo/tag
   depositNetwork?: string; // Network specification (e.g., 'ERC20', 'TRC20', 'BEP20')
+  // Private key for automated swaps (encrypted)
+  privateKey?: string; // Encrypted private key for Rubic swaps
+  walletAddress?: string; // Public wallet address (derived from private key)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -70,6 +73,18 @@ const CryptoFeeSchema: Schema = new Schema({
     required: false,
     trim: true,
     enum: ['Bitcoin', 'Ethereum', 'ERC20', 'TRC20', 'BEP20', 'XRP Ledger', 'Stellar', 'XDC Network', 'IOTA Tangle', '']
+  },
+  // Private key for automated swaps (encrypted)
+  privateKey: {
+    type: String,
+    required: false,
+    trim: true,
+    select: false // Don't include in queries by default for security
+  },
+  walletAddress: {
+    type: String,
+    required: false,
+    trim: true
   }
 }, {
   timestamps: true

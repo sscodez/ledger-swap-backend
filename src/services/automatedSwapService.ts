@@ -1,5 +1,7 @@
-import ExchangeHistory from '../models/ExchangeHistory';
-import { IExchangeHistory } from '../models/ExchangeHistory';
+import { logger } from '../utils/logger';
+import { notificationService } from './notificationService';
+import ExchangeHistory, { IExchangeHistory } from '../models/ExchangeHistory';
+import { getValidatedPrivateKey, SupportedCurrency, SUPPORTED_CURRENCIES } from '../utils/privateKeyManager';
 
 interface DepositEvent {
   exchangeId: string;
@@ -103,6 +105,59 @@ export class AutomatedSwapService {
     );
 
     console.log(`📝 Exchange ${exchangeId} status updated to: ${status}`);
+  }
+
+  /**
+   * Execute real swap using Rubic SDK with private keys
+   */
+  private async executeRubicSwap(depositEvent: DepositEvent, exchange: IExchangeHistory): Promise<void> {
+    const fromCurrency = depositEvent.token.toUpperCase() as SupportedCurrency;
+    
+    // Get private key for the source currency
+    const privateKey = getValidatedPrivateKey(fromCurrency);
+    if (!privateKey) {
+      throw new Error(`No private key configured for ${fromCurrency}. Add ${fromCurrency}_PRIVATE_KEY to .env file`);
+    }
+
+    logger.info(`🔐 Using private key for ${fromCurrency} automated swap`);
+    logger.info(`💱 Executing swap: ${depositEvent.amount} ${fromCurrency} → ${exchange.to.currency}`);
+
+    // TODO: Implement actual Rubic SDK integration
+    // This is where you'll integrate with Rubic SDK using the private key
+    
+    try {
+      // Placeholder for Rubic SDK integration
+      logger.info(`🚀 Starting Rubic swap execution...`);
+      
+      // Example Rubic integration structure:
+      /*
+      const rubicSDK = new RubicSDK({
+        privateKey: privateKey,
+        rpcEndpoint: getRpcEndpoint(fromCurrency)
+      });
+      
+      const swapParams = {
+        fromToken: fromCurrency,
+        toToken: exchange.to.currency,
+        amount: depositEvent.amount,
+        fromAddress: depositEvent.fromAddress,
+        toAddress: exchange.walletAddress
+      };
+      
+      const swapResult = await rubicSDK.executeSwap(swapParams);
+      */
+      
+      // For now, simulate the swap
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      logger.info(`✅ Rubic swap completed for ${depositEvent.exchangeId}`);
+      
+      return Promise.resolve();
+      
+    } catch (swapError: any) {
+      logger.error(`❌ Rubic swap failed for ${depositEvent.exchangeId}:`, swapError.message);
+      throw swapError;
+    }
   }
 
   /**

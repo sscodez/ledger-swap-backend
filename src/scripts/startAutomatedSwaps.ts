@@ -3,9 +3,33 @@ import connectDB from '../config/db';
 import { automatedSwapService } from '../services/automatedSwapService';
 import { depositDetectionService } from '../services/depositDetectionService';
 import { logger } from '../utils/logger';
+import { initializePrivateKeyManager } from '../utils/privateKeyManager';
 
 // Load environment variables
 dotenv.config();
+
+/**
+ * Validate required environment variables
+ */
+function validateEnvironment() {
+  const required = [
+    'MONGODB_URI',
+    'JWT_SECRET'
+  ];
+
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+
+  // Check if automated swaps are enabled
+  if (process.env.ENABLE_AUTOMATED_SWAPS === 'true') {
+    logger.info('✅ Automated swaps enabled');
+  } else {
+    logger.warn('⚠️ Automated swaps disabled (ENABLE_AUTOMATED_SWAPS not set to true)');
+  }
+}
 
 /**
  * Startup script for automated swap system
@@ -15,21 +39,29 @@ async function startAutomatedSwapSystem() {
   console.log('🚀 Initializing LedgerSwap Automated Swap System...\n');
 
   try {
-    // Connect to database
+    // 1. Connect to database
+    logger.info('📊 Connecting to database...');
     await connectDB();
-    logger.info('✅ Connected to MongoDB');
+    logger.info('✅ Database connected successfully');
 
-    // Validate required environment variables
-    validateEnvironmentVariables();
+    // 2. Initialize private key manager
+    logger.info('🔐 Initializing private key management...');
+    const privateKeysConfigured = initializePrivateKeyManager();
+    if (!privateKeysConfigured) {
+      logger.warn('⚠️ No valid private keys found - automated swaps will use mock mode');
+    }
 
-    // Initialize services
+    // 3. Check environment variables
+    logger.info('⚙️ Validating environment configuration...');
+    validateEnvironment();
+    logger.info('✅ Environment validation passed');
+
+    // 4. Initialize automated swap services...
     logger.info('🔧 Initializing automated swap services...');
 
     // Start deposit detection service
     await depositDetectionService.startMonitoring();
-    logger.info('✅ Deposit detection service started');
-
-    // Get system status
+    logger.info('✅ deposit detection service started');
     const swapStatus = automatedSwapService.getSwapQueueStatus();
     const monitoringStatus = depositDetectionService.getMonitoringStatus();
 
