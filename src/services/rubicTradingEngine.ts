@@ -279,14 +279,14 @@ export class RubicTradingEngine implements ITradingEngine {
   private getTokenAddress(symbol: string): string {
     const addresses: Record<string, string> = {
       'ETH': '0x0000000000000000000000000000000000000000', // Native ETH
-      'BTC': '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', // WBTC
-      'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT
-      'USDC': '0xA0b86a33E6441b8bB770794D5C0495c13DCE7Ec0', // USDC
-      'XRP': '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // XRP binance
-      'XLM': '0x43C934A845205F0b514417d757d7235B8f53f1B9', // XLM
+      'BTC': '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', // BTCB on BSC
+      'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT on Ethereum
+      'USDC': '0xA0b86a33E6441b8bB770794D5C0495c13DCE7Ec0', // USDC on Ethereum
+      'XRP': '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // XRP on BSC
+      'XLM': '0x43C934A845205F0b514417d757d7235B8f53f1B9', // XLM on BSC
       'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // XDC on Ethereum
-      'MIOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA (Binance-Peg IOTA Token)
-      'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA (Binance-Peg IOTA Token)
+      'MIOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
+      'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
       'BNB': '0x0000000000000000000000000000000000000000', // Native BNB
       'MATIC': '0x0000000000000000000000000000000000000000', // Native MATIC
       'ARB': '0x0000000000000000000000000000000000000000' // Native ARB
@@ -310,7 +310,7 @@ export class RubicTradingEngine implements ITradingEngine {
         symbol: 'XRP',
         name: 'Ripple',
         blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-        address: '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
+        address: '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
         decimals: 6,
         isActive: true
       },
