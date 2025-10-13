@@ -109,7 +109,8 @@ export class RubicTradingEngine implements ITradingEngine {
       const bestTrade = trades[0];
       
       if (!bestTrade || !(bestTrade instanceof OnChainTrade)) {
-        throw new Error(`Trade calculation failed: ${bestTrade?.error || 'No trades available'}`);
+        console.log('⚠️ Invalid trade object from Rubic, using fallback calculation');
+        return this.getFallbackQuote(fromToken, toToken, amount);
       }
 
       return {
@@ -126,8 +127,9 @@ export class RubicTradingEngine implements ITradingEngine {
       };
 
     } catch (error: any) {
-      console.error('Error getting Rubic on-chain quote:', error);
-      throw error;
+      console.error('❌ Error getting Rubic on-chain quote:', error.message);
+      console.log('🔄 Falling back to calculated quote due to Rubic error');
+      return this.getFallbackQuote(fromToken, toToken, amount);
     }
   }
 
@@ -157,7 +159,8 @@ export class RubicTradingEngine implements ITradingEngine {
       const bestWrappedTrade = wrappedTrades[0];
       
       if (bestWrappedTrade.error || !bestWrappedTrade.trade) {
-        throw new Error(`Cross-chain trade calculation failed: ${bestWrappedTrade.error}`);
+        console.log('⚠️ Cross-chain trade error from Rubic, using fallback calculation');
+        return this.getFallbackQuote(fromToken, toToken, amount);
       }
 
       const bestTrade = bestWrappedTrade.trade;
@@ -176,8 +179,9 @@ export class RubicTradingEngine implements ITradingEngine {
       };
 
     } catch (error: any) {
-      console.error('Error getting Rubic cross-chain quote:', error);
-      throw error;
+      console.error('❌ Error getting Rubic cross-chain quote:', error.message);
+      console.log('🔄 Falling back to calculated quote due to cross-chain error');
+      return this.getFallbackQuote(fromToken, toToken, amount);
     }
   }
 
