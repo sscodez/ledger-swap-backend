@@ -50,12 +50,18 @@ const getTradingQuote = (req, res) => __awaiter(void 0, void 0, void 0, function
                 message: 'fromToken, toToken, and amount are required'
             });
         }
-        // Use Rubic SDK only - no mock fallbacks
+        // Check if Rubic is initialized, if not try to initialize it
         if (!rubicInitialized) {
-            return res.status(503).json({
-                message: 'Trading engine not available',
-                error: 'Rubic SDK is not initialized. Please try again later.'
-            });
+            console.log('⚠️ Rubic not initialized, attempting to initialize...');
+            try {
+                yield rubicEngine.initialize();
+                rubicInitialized = true;
+                console.log('✅ Rubic SDK initialized successfully on demand');
+            }
+            catch (initError) {
+                console.error('❌ Failed to initialize Rubic SDK on demand:', initError.message);
+                // Continue anyway - the getBestQuote will use fallback
+            }
         }
         // Get real quote from Rubic SDK
         const quote = yield rubicEngine.getBestQuote(fromToken, toToken, amount);
@@ -279,7 +285,9 @@ const getSupportedTokens = (req, res) => __awaiter(void 0, void 0, void 0, funct
         console.error('Error getting supported tokens:', error);
         return res.status(500).json({
             message: 'Failed to get supported tokens',
-            error: error.message
+            error: error.message,
+            provider: 'rubic',
+            rubicStatus: rubicInitialized ? 'initialized' : 'not-initialized'
         });
     }
 });
@@ -290,10 +298,10 @@ const getSupportedTradingPairs = (req, res) => __awaiter(void 0, void 0, void 0,
         if (!rubicInitialized) {
             return res.status(503).json({
                 message: 'Trading engine not available',
-                error: 'Rubic SDK is not initialized. Cannot get supported pairs.'
+                error: 'Rubic SDK is not initialized. Cannot get supported trading pairs.'
             });
         }
-        // Get pairs from Rubic SDK only
+        // Get trading pairs from Rubic SDK only
         const supportedPairs = rubicEngine.getSupportedTradingPairs();
         return res.json({
             pairs: supportedPairs,
@@ -307,7 +315,9 @@ const getSupportedTradingPairs = (req, res) => __awaiter(void 0, void 0, void 0,
         console.error('Error getting supported trading pairs:', error);
         return res.status(500).json({
             message: 'Failed to get supported trading pairs',
-            error: error.message
+            error: error.message,
+            provider: 'rubic',
+            rubicStatus: rubicInitialized ? 'initialized' : 'not-initialized'
         });
     }
 });

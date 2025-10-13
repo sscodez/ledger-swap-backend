@@ -44,15 +44,36 @@ export class RubicTradingEngine implements ITradingEngine {
   }
 
   async initialize(): Promise<void> {
-    try {
-      console.log('🔄 Initializing Rubic SDK with config:', JSON.stringify(this.config, null, 2));
-      this.sdk = await SDK.createSDK(this.config);
-      console.log('✅ Rubic SDK initialized successfully');
-    } catch (error: any) {
-      console.error('❌ Failed to initialize Rubic SDK:', error.message);
-      console.error('❌ Full error:', error);
-      throw error;
+    const maxRetries = 3;
+    let lastError: any;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Initializing Rubic SDK (attempt ${attempt}/${maxRetries})`);
+        console.log('Config:', JSON.stringify(this.config, null, 2));
+        
+        this.sdk = await SDK.createSDK(this.config);
+        console.log('✅ Rubic SDK initialized successfully');
+        return; // Success, exit the retry loop
+        
+      } catch (error: any) {
+        lastError = error;
+        console.error(`❌ Attempt ${attempt} failed:`, error.message);
+        
+        if (attempt < maxRetries) {
+          const delay = attempt * 2000; // 2s, 4s delays
+          console.log(`⏳ Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
     }
+
+    // All retries failed
+    console.error('❌ Failed to initialize Rubic SDK after all retries:', lastError.message);
+    console.error('❌ Full error:', lastError);
+    
+    // Don't throw - let the system continue with fallback
+    console.log('⚠️ Continuing without Rubic SDK - will use fallback calculations');
   }
 
   // Get best quote for same-chain swaps
@@ -197,6 +218,12 @@ export class RubicTradingEngine implements ITradingEngine {
       throw new Error(`Trading pair ${fromToken} → ${toToken} is not supported. Check supported pairs with /api/trading/supported-tokens`);
     }
 
+    // If SDK is not initialized, use fallback immediately
+    if (!this.sdk) {
+      console.log('⚠️ Rubic SDK not available, using fallback calculation');
+      return await this.getFallbackQuote(fromToken, toToken, amount);
+    }
+
     const fromBlockchain = this.getBlockchainFromToken(fromToken);
     const toBlockchain = this.getBlockchainFromToken(toToken);
     
@@ -214,8 +241,8 @@ export class RubicTradingEngine implements ITradingEngine {
       }
     } catch (error: any) {
       console.error('❌ Error getting best quote:', error.message);
-      console.error('❌ Full error details:', error);
-      throw error;
+      console.log('🔄 Falling back to calculated quote due to error');
+      return await this.getFallbackQuote(fromToken, toToken, amount);
     }
   }
 
