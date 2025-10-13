@@ -7,6 +7,10 @@ export interface ICryptoFee extends Document {
   minimumFee: number;
   maximumFee: number;
   isActive: boolean;
+  // Deposit address fields for automated swaps
+  depositAddress?: string;
+  depositMemo?: string; // For currencies like XRP, XLM that need memo/tag
+  depositNetwork?: string; // Network specification (e.g., 'ERC20', 'TRC20', 'BEP20')
   createdAt: Date;
   updatedAt: Date;
 }
@@ -49,6 +53,23 @@ const CryptoFeeSchema: Schema = new Schema({
     type: Boolean,
     default: true,
     index: true
+  },
+  // Deposit address fields for automated swaps
+  depositAddress: {
+    type: String,
+    required: false,
+    trim: true
+  },
+  depositMemo: {
+    type: String,
+    required: false,
+    trim: true
+  },
+  depositNetwork: {
+    type: String,
+    required: false,
+    trim: true,
+    enum: ['Bitcoin', 'Ethereum', 'ERC20', 'TRC20', 'BEP20', 'XRP Ledger', 'Stellar', 'XDC Network', 'IOTA Tangle', '']
   }
 }, {
   timestamps: true

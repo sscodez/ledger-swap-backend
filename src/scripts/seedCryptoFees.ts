@@ -1,5 +1,5 @@
-import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import connectDB from '../config/db';
 import CryptoFee from '../models/CryptoFee';
 
 dotenv.config();
@@ -50,7 +50,7 @@ const cryptoFeesData = [
 async function seedCryptoFees() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ledgerswap');
+    await connectDB();
     console.log('Connected to MongoDB');
 
     // Clear existing crypto fees
@@ -68,9 +68,7 @@ async function seedCryptoFees() {
     console.log('\n✅ Crypto fees seeded successfully!');
   } catch (error) {
     console.error('❌ Error seeding crypto fees:', error);
-  } finally {
-    await mongoose.disconnect();
-    console.log('Disconnected from MongoDB');
+    throw error; // Re-throw for seedAll.ts to handle
   }
 }
 

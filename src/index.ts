@@ -23,7 +23,9 @@ import kucoinRoutes from './routes/kucoinRoutes';
 import cryptoFeeRoutes from './routes/cryptoFeeRoutes';
 import contactRoutes from './routes/contactRoutes';
 import tradingRoutes from './routes/tradingRoutes';
+import automatedSwapRoutes from './routes/automatedSwapRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
+import startAutomatedSwapSystem from './scripts/startAutomatedSwaps';
 
 dotenv.config();
 const app = express();
@@ -123,6 +125,7 @@ app.use('/api/kucoin', kucoinRoutes);
 app.use('/api/crypto-fees', cryptoFeeRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/trading', tradingRoutes);
+app.use('/api/automated-swaps', automatedSwapRoutes);
 
 async function start() {
   try {
@@ -132,13 +135,25 @@ async function start() {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
       
-      // Start KuCoin monitoring service after server is running
+      // Start services after server is running
       setTimeout(async () => {
         try {
           console.log('🚀 Starting KuCoin monitoring service...');
           await kucoinMonitoringService.start();
         } catch (error: any) {
           console.error('❌ Failed to start KuCoin monitoring service:', error.message);
+        }
+
+        // Start automated swap system if enabled
+        if (process.env.ENABLE_AUTOMATED_SWAPS === 'true') {
+          try {
+            console.log('🤖 Starting automated swap system...');
+            await startAutomatedSwapSystem();
+          } catch (error: any) {
+            console.error('❌ Failed to start automated swap system:', error.message);
+          }
+        } else {
+          console.log('ℹ️ Automated swaps disabled. Set ENABLE_AUTOMATED_SWAPS=true to enable.');
         }
       }, 5000); // Wait 5 seconds for server to fully initialize
     });

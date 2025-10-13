@@ -11,7 +11,10 @@
     "prestart": "npm run build",
     "seed:admin": "ts-node-dev --transpile-only src/scripts/seedAdmin.ts",
     "seed:users": "ts-node-dev --transpile-only src/scripts/seedUsers.ts",
-    "seed:crypto-fees": "ts-node-dev --transpile-only src/scripts/seedCryptoFees.ts"
+    "seed:crypto-fees": "ts-node-dev --transpile-only src/scripts/seedCryptoFees.ts",
+    "seed:all": "ts-node-dev --transpile-only src/scripts/seedAll.ts",
+    "seed": "npm run seed:all",
+    "start:automated-swaps": "ts-node-dev --transpile-only src/scripts/startAutomatedSwaps.ts"
   },
   "keywords": [],
   "author": "",
@@ -32,7 +35,9 @@
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
-    "rubic-sdk": "^5.57.4"
+    "rubic-sdk": "^5.57.4",
+    "ethers": "^6.8.0",
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
@@ -46,6 +51,7 @@
     "@types/passport-google-oauth20": "^2.0.0",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
+    "@types/nodemailer": "^6.4.14",
     "cors": "^2.8.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
