@@ -7,13 +7,15 @@ import {
   simulateSwap,
   getSupportedTokens,
   getSupportedTradingPairs,
-  getTradingHealth
+  getTradingHealth,
+  testRubicSDK
 } from '../controllers/tradingController';
 
 const router = Router();
 
 // Public routes - no authentication required
 router.get('/health', getTradingHealth);
+router.get('/test', testRubicSDK);
 router.get('/quote', getTradingQuote);
 router.get('/supported-tokens', getSupportedTokens);
 router.get('/supported-pairs', getSupportedTradingPairs);

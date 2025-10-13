@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTradingHealth = exports.getSupportedTradingPairs = exports.getSupportedTokens = exports.simulateSwap = exports.getSwapStatus = exports.executeSwap = exports.getTradingQuote = void 0;
+exports.testRubicSDK = exports.getTradingHealth = exports.getSupportedTradingPairs = exports.getSupportedTokens = exports.simulateSwap = exports.getSwapStatus = exports.executeSwap = exports.getTradingQuote = void 0;
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
 const rubicTradingEngine_1 = __importDefault(require("../services/rubicTradingEngine"));
@@ -328,11 +328,39 @@ const getTradingHealth = (req, res) => __awaiter(void 0, void 0, void 0, functio
         });
     }
     catch (error) {
-        console.error('Error getting trading health:', error);
+        console.error('❌ Error checking trading health:', error);
         return res.status(500).json({
-            message: 'Failed to get trading health',
+            message: 'Failed to check trading health',
             error: error.message
         });
     }
 });
 exports.getTradingHealth = getTradingHealth;
+// GET /api/trading/test - Test Rubic SDK functionality
+const testRubicSDK = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        if (!rubicInitialized) {
+            return res.status(503).json({
+                message: 'Rubic SDK not initialized',
+                error: 'Cannot test - SDK not ready'
+            });
+        }
+        // Test with a simple XRP to BTC quote (both on BSC)
+        console.log('Testing Rubic SDK with XRP → BTC quote...');
+        const testQuote = yield rubicEngine.getBestQuote('XRP', 'BTC', '100');
+        return res.json({
+            message: 'Rubic SDK test successful',
+            testQuote,
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        console.error('Rubic SDK test failed:', error);
+        return res.status(500).json({
+            message: 'Rubic SDK test failed',
+            error: error.message,
+            details: error.toString()
+        });
+    }
+});
+exports.testRubicSDK = testRubicSDK;

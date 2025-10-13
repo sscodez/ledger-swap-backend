@@ -6,6 +6,7 @@ const tradingController_1 = require("../controllers/tradingController");
 const router = (0, express_1.Router)();
 // Public routes - no authentication required
 router.get('/health', tradingController_1.getTradingHealth);
+router.get('/test', tradingController_1.testRubicSDK);
 router.get('/quote', tradingController_1.getTradingQuote);
 router.get('/supported-tokens', tradingController_1.getSupportedTokens);
 router.get('/supported-pairs', tradingController_1.getSupportedTradingPairs);

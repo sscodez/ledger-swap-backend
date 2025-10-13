@@ -65,10 +65,12 @@ export class RubicTradingEngine implements ITradingEngine {
 
   async initialize(): Promise<void> {
     try {
+      console.log('🔄 Initializing Rubic SDK with config:', JSON.stringify(this.config, null, 2));
       this.sdk = await SDK.createSDK(this.config);
       console.log('✅ Rubic SDK initialized successfully');
     } catch (error: any) {
       console.error('❌ Failed to initialize Rubic SDK:', error.message);
+      console.error('❌ Full error:', error);
       throw error;
     }
   }
@@ -83,6 +85,12 @@ export class RubicTradingEngine implements ITradingEngine {
       const blockchain = this.getBlockchainFromToken(fromToken);
       const fromTokenAddress = this.getTokenAddress(fromToken);
       const toTokenAddress = this.getTokenAddress(toToken);
+      
+      console.log(`🔗 On-chain quote details:`);
+      console.log(`   Blockchain: ${blockchain}`);
+      console.log(`   From: ${fromToken} → ${fromTokenAddress}`);
+      console.log(`   To: ${toToken} → ${toTokenAddress}`);
+      console.log(`   Amount: ${amount}`);
 
       const trades = await this.sdk.onChainManager.calculateTrade(
         { blockchain, address: fromTokenAddress },
@@ -170,6 +178,8 @@ export class RubicTradingEngine implements ITradingEngine {
 
   // Get best quote (tries both on-chain and cross-chain)
   async getBestQuote(fromToken: string, toToken: string, amount: string): Promise<SwapQuote> {
+    console.log(`🔄 Getting quote for ${amount} ${fromToken} → ${toToken}`);
+    
     // Validate trading pair is supported
     if (!this.isTradingPairSupported(fromToken, toToken)) {
       throw new Error(`Trading pair ${fromToken} → ${toToken} is not supported. Check supported pairs with /api/trading/supported-tokens`);
@@ -177,17 +187,22 @@ export class RubicTradingEngine implements ITradingEngine {
 
     const fromBlockchain = this.getBlockchainFromToken(fromToken);
     const toBlockchain = this.getBlockchainFromToken(toToken);
+    
+    console.log(`📍 From blockchain: ${fromBlockchain}, To blockchain: ${toBlockchain}`);
 
     try {
       // If same blockchain, use on-chain
       if (fromBlockchain === toBlockchain) {
+        console.log('🔗 Using on-chain quote');
         return await this.getOnChainQuote(fromToken, toToken, amount);
       } else {
         // Different blockchains, use cross-chain
+        console.log('🌉 Using cross-chain quote');
         return await this.getCrossChainQuote(fromToken, toToken, amount);
       }
     } catch (error: any) {
-      console.error('Error getting best quote:', error);
+      console.error('❌ Error getting best quote:', error.message);
+      console.error('❌ Full error details:', error);
       throw error;
     }
   }
@@ -242,13 +257,14 @@ export class RubicTradingEngine implements ITradingEngine {
   // Helper function to get blockchain from token symbol
   private getBlockchainFromToken(tokenSymbol: string): typeof BLOCKCHAIN_NAME[keyof typeof BLOCKCHAIN_NAME] {
     const tokenBlockchains: Record<string, typeof BLOCKCHAIN_NAME[keyof typeof BLOCKCHAIN_NAME]> = {
-      'BTC': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // BTCB on BSC
+      // BTCB on BSC
       'ETH': BLOCKCHAIN_NAME.ETHEREUM,
       'USDT': BLOCKCHAIN_NAME.ETHEREUM,
       'USDC': BLOCKCHAIN_NAME.ETHEREUM,
+      'BTC': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
       'XRP': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XRP on BSC
       'XLM': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XLM on BSC
-      'XDC': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XDC on BSC
+      'XDC': BLOCKCHAIN_NAME.ETHEREUM, // XDC on BSC
       'MIOTA': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
       'IOTA': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
       'BNB': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
@@ -268,7 +284,7 @@ export class RubicTradingEngine implements ITradingEngine {
       'USDC': '0xA0b86a33E6441b8bB770794D5C0495c13DCE7Ec0', // USDC
       'XRP': '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // XRP binance
       'XLM': '0x43C934A845205F0b514417d757d7235B8f53f1B9', // XLM
-      'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // XDC
+      'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // XDC on Ethereum
       'MIOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA (Binance-Peg IOTA Token)
       'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA (Binance-Peg IOTA Token)
       'BNB': '0x0000000000000000000000000000000000000000', // Native BNB
@@ -309,7 +325,7 @@ export class RubicTradingEngine implements ITradingEngine {
       {
         symbol: 'XDC',
         name: 'XinFin',
-        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
+        blockchain: BLOCKCHAIN_NAME.ETHEREUM,
         address: '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2',
         decimals: 18,
         isActive: true

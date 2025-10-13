@@ -375,10 +375,39 @@ export const getTradingHealth: RequestHandler = async (req: Request, res: Respon
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
-    console.error('Error getting trading health:', error);
+    console.error('❌ Error checking trading health:', error);
     return res.status(500).json({
-      message: 'Failed to get trading health',
+      message: 'Failed to check trading health',
       error: error.message
+    });
+  }
+};
+
+// GET /api/trading/test - Test Rubic SDK functionality
+export const testRubicSDK: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    if (!rubicInitialized) {
+      return res.status(503).json({
+        message: 'Rubic SDK not initialized',
+        error: 'Cannot test - SDK not ready'
+      });
+    }
+
+    // Test with a simple XRP to BTC quote (both on BSC)
+    console.log('Testing Rubic SDK with XRP → BTC quote...');
+    const testQuote = await rubicEngine.getBestQuote('XRP', 'BTC', '100');
+    
+    return res.json({
+      message: 'Rubic SDK test successful',
+      testQuote,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Rubic SDK test failed:', error);
+    return res.status(500).json({
+      message: 'Rubic SDK test failed',
+      error: error.message,
+      details: error.toString()
     });
   }
 };
