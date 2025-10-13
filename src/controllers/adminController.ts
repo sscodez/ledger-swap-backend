@@ -74,6 +74,36 @@ export const adminFlagAddress = async (req: Request, res: Response) => {
   }
 };
 
+// Admin: delete a flagged address
+export const adminDeleteFlaggedAddress = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({ message: 'Address ID is required' });
+    }
+
+    // Find and delete the flagged address
+    const deletedAddress = await Address.findByIdAndDelete(id);
+    
+    if (!deletedAddress) {
+      return res.status(404).json({ message: 'Flagged address not found' });
+    }
+
+    res.json({ 
+      message: 'Flagged address deleted successfully',
+      deletedAddress: {
+        id: deletedAddress._id,
+        address: deletedAddress.address,
+        coin: deletedAddress.coin,
+        network: deletedAddress.network
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: 'Failed to delete flagged address', error: err.message });
+  }
+};
+
 // Send support email (admin -> support mailbox)
 export const sendSupportEmail = async (req: Request, res: Response) => {
   try {

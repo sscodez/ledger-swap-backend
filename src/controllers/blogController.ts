@@ -2,16 +2,28 @@ import { Request, Response } from 'express';
 import Blog, { IBlog } from '../models/Blog';
 import User, { IUser } from '../models/User';
 import mongoose from 'mongoose';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 // Get all blogs with pagination and filtering
 export const getAllBlogs = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const category = req.query.category as string;
-    const status = req.query.status as string || 'published';
     const search = req.query.search as string;
     const tag = req.query.tag as string;
+    
+    // Determine status filter based on user role
+    const isAdmin = authReq.user && authReq.user.role === 'admin';
+    let status = req.query.status as string;
+    
+    // If no status specified and user is not admin, default to published
+    if (!status && !isAdmin) {
+      status = 'published';
+    }
+    
+    console.log(`Blog request from ${isAdmin ? 'admin' : 'public'} user, status filter: ${status || 'all'}`);
 
     const skip = (page - 1) * limit;
 
@@ -38,6 +50,8 @@ export const getAllBlogs = async (req: Request, res: Response) => {
       ];
     }
 
+    console.log('Blog query:', query);
+    
     const blogs = await Blog.find(query)
       .populate('author', 'name email profilePicture')
       .sort({ publishedAt: -1, createdAt: -1 })
@@ -46,6 +60,8 @@ export const getAllBlogs = async (req: Request, res: Response) => {
       .lean();
 
     const total = await Blog.countDocuments(query);
+    
+    console.log(`Found ${blogs.length} blogs out of ${total} total`);
 
     res.json({
       success: true,
@@ -100,10 +116,12 @@ export const getBlogBySlug = async (req: Request, res: Response) => {
   }
 };
 
-// Get blog by ID (for admin)
+// Get blog by ID (with optional auth)
 export const getBlogById = async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
     const { id } = req.params;
+    const isAdmin = authReq.user && authReq.user.role === 'admin';
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -112,7 +130,13 @@ export const getBlogById = async (req: Request, res: Response) => {
       });
     }
 
-    const blog = await Blog.findById(id)
+    // Build query based on user role
+    const query: any = { _id: id };
+    if (!isAdmin) {
+      query.status = 'published'; // Non-admin users can only see published blogs
+    }
+
+    const blog = await Blog.findOne(query)
       .populate('author', 'name email profilePicture')
       .lean();
 

@@ -10,19 +10,19 @@ import {
   getPopularTags,
   getFeaturedBlogs
 } from '../controllers/blogController';
-import { protect } from '../middleware/authMiddleware';
+import { protect, optionalAuth } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
-// Public routes
-router.get('/', getAllBlogs);
+// Public routes (with optional auth for admin features)
+router.get('/', optionalAuth, getAllBlogs);
 router.get('/categories', getBlogCategories);
 router.get('/tags', getPopularTags);
 router.get('/featured', getFeaturedBlogs);
 router.get('/slug/:slug', getBlogBySlug);
 
 // Protected routes (admin only)
-router.get('/:id', protect, getBlogById);
+router.get('/:id', optionalAuth, getBlogById);
 router.post('/', protect, createBlog);
 router.put('/:id', protect, updateBlog);
 router.delete('/:id', protect, deleteBlog);

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { protect, isAdmin, AuthRequest } from '../middleware/authMiddleware';
-import { listUsers, updateUserRole, listAllTransactions, listFlaggedAddresses, getAdminMetrics, getPlatformSettings, updateSwapFeePercent, getFeeRevenueLastNDays, listTradeActivity, updatePlatformSettings, sendSupportEmail, listSupportMessages, adminFlagAddress, adminListChains, adminSetChainEnabled, adminListTokens, adminSetTokenEnabled, adminCreateToken } from '../controllers/adminController';
+import { listUsers, updateUserRole, listAllTransactions, listFlaggedAddresses, getAdminMetrics, getPlatformSettings, updateSwapFeePercent, getFeeRevenueLastNDays, listTradeActivity, updatePlatformSettings, sendSupportEmail, listSupportMessages, adminFlagAddress, adminDeleteFlaggedAddress, adminListChains, adminSetChainEnabled, adminListTokens, adminSetTokenEnabled, adminCreateToken } from '../controllers/adminController';
 import { adminListDisputes, adminUpdateDisputeStatus, adminReplyToDispute } from '../controllers/disputeController';
 
 const router = Router();
@@ -143,6 +143,32 @@ router.get('/flagged-addresses', protect, isAdmin, listFlaggedAddresses);
  *         description: Flagged address created/updated
  */
 router.post('/flagged-addresses', protect, isAdmin, adminFlagAddress);
+
+/**
+ * @openapi
+ * /api/admin/flagged-addresses/{id}:
+ *   delete:
+ *     summary: Delete a flagged address
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the flagged address to delete
+ *     responses:
+ *       '200':
+ *         description: Flagged address deleted successfully
+ *       '404':
+ *         description: Flagged address not found
+ *       '400':
+ *         description: Invalid address ID
+ */
+router.delete('/flagged-addresses/:id', protect, isAdmin, adminDeleteFlaggedAddress);
+
 /**
  * @openapi
  * /api/admin/metrics:
