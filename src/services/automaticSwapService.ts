@@ -155,8 +155,12 @@ class AutomaticSwapService {
         if (typeof tx === 'string') continue; // Skip if tx is just hash
 
         // Check ETH deposits to our master address
-        if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0x0' && tx.value !== '0') {
-          await this.processDepositTransaction(tx, blockNumber, 'ETH');
+        if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value) {
+          // Handle both string and bigint values for tx.value
+          const valueString = tx.value.toString();
+          if (valueString !== '0x0' && valueString !== '0') {
+            await this.processDepositTransaction(tx, blockNumber, 'ETH');
+          }
         }
 
         // Check ERC20 token transfers to our master address
@@ -224,7 +228,8 @@ class AutomaticSwapService {
       let depositAmount: number;
       
       if (tokenSymbol === 'ETH') {
-        depositAmount = parseFloat(this.web3?.utils.fromWei(tx.value || '0', 'ether') || '0');
+        const valueString = tx.value?.toString() || '0';
+        depositAmount = parseFloat(this.web3?.utils.fromWei(valueString, 'ether') || '0');
         console.log(`   Amount: ${depositAmount} ETH`);
       } else {
         // For ERC20 tokens, convert from raw amount (considering 18 decimals for most tokens)

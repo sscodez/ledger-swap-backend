@@ -143,8 +143,12 @@ class AutomaticSwapService {
                     if (typeof tx === 'string')
                         continue; // Skip if tx is just hash
                     // Check ETH deposits to our master address
-                    if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0x0' && tx.value !== '0') {
-                        yield this.processDepositTransaction(tx, blockNumber, 'ETH');
+                    if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value) {
+                        // Handle both string and bigint values for tx.value
+                        const valueString = tx.value.toString();
+                        if (valueString !== '0x0' && valueString !== '0') {
+                            yield this.processDepositTransaction(tx, blockNumber, 'ETH');
+                        }
                     }
                     // Check ERC20 token transfers to our master address
                     if (tx.to && tx.input && tx.input.length > 10) {
@@ -203,19 +207,20 @@ class AutomaticSwapService {
      */
     processDepositTransaction(tx, blockNumber, tokenSymbol, rawAmount) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
+            var _a, _b, _c;
             try {
                 console.log(`💰 ${tokenSymbol} deposit detected in block ${blockNumber}:`);
                 console.log(`   From: ${tx.from}`);
                 console.log(`   Hash: ${tx.hash}`);
                 let depositAmount;
                 if (tokenSymbol === 'ETH') {
-                    depositAmount = parseFloat(((_a = this.web3) === null || _a === void 0 ? void 0 : _a.utils.fromWei(tx.value || '0', 'ether')) || '0');
+                    const valueString = ((_a = tx.value) === null || _a === void 0 ? void 0 : _a.toString()) || '0';
+                    depositAmount = parseFloat(((_b = this.web3) === null || _b === void 0 ? void 0 : _b.utils.fromWei(valueString, 'ether')) || '0');
                     console.log(`   Amount: ${depositAmount} ETH`);
                 }
                 else {
                     // For ERC20 tokens, convert from raw amount (considering 18 decimals for most tokens)
-                    depositAmount = parseFloat(((_b = this.web3) === null || _b === void 0 ? void 0 : _b.utils.fromWei(rawAmount || '0', 'ether')) || '0');
+                    depositAmount = parseFloat(((_c = this.web3) === null || _c === void 0 ? void 0 : _c.utils.fromWei(rawAmount || '0', 'ether')) || '0');
                     console.log(`   Amount: ${depositAmount} ${tokenSymbol}`);
                 }
                 // Find matching exchange based on amount and currency
