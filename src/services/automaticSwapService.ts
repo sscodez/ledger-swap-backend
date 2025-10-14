@@ -20,7 +20,7 @@ class AutomaticSwapService {
   private pendingExchanges: Map<string, PendingExchange> = new Map();
   private monitoringInterval: NodeJS.Timeout | null = null;
   private readonly MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
-  private lastCheckedBlock = 0;
+  private lastCheckedBlock: number = 0;
 
   constructor() {
     this.initializeService();
@@ -36,7 +36,7 @@ class AutomaticSwapService {
       this.web3 = new Web3(rpcUrl);
       
       // Get current block number
-      this.lastCheckedBlock = await this.web3.eth.getBlockNumber();
+      this.lastCheckedBlock = Number(await this.web3.eth.getBlockNumber());
       console.log('📊 Starting from block:', this.lastCheckedBlock);
       
       console.log('✅ Automatic Swap Service initialized');
@@ -119,18 +119,18 @@ class AutomaticSwapService {
       // Get latest block number
       const latestBlock = await this.web3.eth.getBlockNumber();
       
-      if (latestBlock <= this.lastCheckedBlock) {
+      if (latestBlock <= BigInt(this.lastCheckedBlock)) {
         return; // No new blocks
       }
 
-      console.log(`📊 Checking blocks ${this.lastCheckedBlock + 1} to ${latestBlock}`);
+      console.log(`📊 Checking blocks ${this.lastCheckedBlock + 1} to ${Number(latestBlock)}`);
 
       // Check each block for transactions to our address
-      for (let blockNumber = this.lastCheckedBlock + 1; blockNumber <= latestBlock; blockNumber++) {
+      for (let blockNumber = this.lastCheckedBlock + 1; blockNumber <= Number(latestBlock); blockNumber++) {
         await this.checkBlockForDeposits(blockNumber);
       }
 
-      this.lastCheckedBlock = latestBlock;
+      this.lastCheckedBlock = Number(latestBlock);
 
       // Clean up expired exchanges
       this.cleanupExpiredExchanges();
@@ -155,7 +155,7 @@ class AutomaticSwapService {
         if (typeof tx === 'string') continue; // Skip if tx is just hash
 
         // Check ETH deposits to our master address
-        if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0') {
+        if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0x0') {
           await this.processDepositTransaction(tx, blockNumber, 'ETH');
         }
 

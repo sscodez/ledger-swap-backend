@@ -144,6 +144,30 @@ router.get('/flagged-addresses', authMiddleware_1.protect, authMiddleware_1.isAd
 router.post('/flagged-addresses', authMiddleware_1.protect, authMiddleware_1.isAdmin, adminController_1.adminFlagAddress);
 /**
  * @openapi
+ * /api/admin/flagged-addresses/{id}:
+ *   delete:
+ *     summary: Delete a flagged address
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The ID of the flagged address to delete
+ *     responses:
+ *       '200':
+ *         description: Flagged address deleted successfully
+ *       '404':
+ *         description: Flagged address not found
+ *       '400':
+ *         description: Invalid address ID
+ */
+router.delete('/flagged-addresses/:id', authMiddleware_1.protect, authMiddleware_1.isAdmin, adminController_1.adminDeleteFlaggedAddress);
+/**
+ * @openapi
  * /api/admin/metrics:
  *   get:
  *     summary: Admin metrics

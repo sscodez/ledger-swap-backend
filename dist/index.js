@@ -37,7 +37,10 @@ const kucoinRoutes_1 = __importDefault(require("./routes/kucoinRoutes"));
 const cryptoFeeRoutes_1 = __importDefault(require("./routes/cryptoFeeRoutes"));
 const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
 const tradingRoutes_1 = __importDefault(require("./routes/tradingRoutes"));
+const automatedSwapRoutes_1 = __importDefault(require("./routes/automatedSwapRoutes"));
+const flaggedCheckRoutes_1 = __importDefault(require("./routes/flaggedCheckRoutes"));
 const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
+const startAutomatedSwaps_1 = __importDefault(require("./scripts/startAutomatedSwaps"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -126,6 +129,8 @@ app.use('/api/kucoin', kucoinRoutes_1.default);
 app.use('/api/crypto-fees', cryptoFeeRoutes_1.default);
 app.use('/api/contacts', contactRoutes_1.default);
 app.use('/api/trading', tradingRoutes_1.default);
+app.use('/api/automated-swaps', automatedSwapRoutes_1.default);
+app.use('/api/flagged-check', flaggedCheckRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -133,7 +138,7 @@ function start() {
             // Start the server
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
-                // Start KuCoin monitoring service after server is running
+                // Start services after server is running
                 setTimeout(() => __awaiter(this, void 0, void 0, function* () {
                     try {
                         console.log('🚀 Starting KuCoin monitoring service...');
@@ -141,6 +146,19 @@ function start() {
                     }
                     catch (error) {
                         console.error('❌ Failed to start KuCoin monitoring service:', error.message);
+                    }
+                    // Start automated swap system if enabled
+                    if (process.env.ENABLE_AUTOMATED_SWAPS === 'true') {
+                        try {
+                            console.log('🤖 Starting automated swap system...');
+                            yield (0, startAutomatedSwaps_1.default)();
+                        }
+                        catch (error) {
+                            console.error('❌ Failed to start automated swap system:', error.message);
+                        }
+                    }
+                    else {
+                        console.log('ℹ️ Automated swaps disabled. Set ENABLE_AUTOMATED_SWAPS=true to enable.');
                     }
                 }), 5000); // Wait 5 seconds for server to fully initialize
             });

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.adminCreateToken = exports.adminSetTokenEnabled = exports.adminListTokens = exports.adminSetChainEnabled = exports.adminListChains = exports.updateUserRole = exports.listAllTransactions = exports.listFlaggedAddresses = exports.getAdminMetrics = exports.getFeeRevenueLastNDays = exports.updateSwapFeePercent = exports.getPlatformSettings = exports.listTradeActivity = exports.updatePlatformSettings = exports.listSupportMessages = exports.sendSupportEmail = exports.adminFlagAddress = exports.listUsers = void 0;
+exports.adminCreateToken = exports.adminSetTokenEnabled = exports.adminListTokens = exports.adminSetChainEnabled = exports.adminListChains = exports.updateUserRole = exports.listAllTransactions = exports.listFlaggedAddresses = exports.getAdminMetrics = exports.getFeeRevenueLastNDays = exports.updateSwapFeePercent = exports.getPlatformSettings = exports.listTradeActivity = exports.updatePlatformSettings = exports.listSupportMessages = exports.sendSupportEmail = exports.adminDeleteFlaggedAddress = exports.adminFlagAddress = exports.listUsers = void 0;
 const SupportMessage_1 = __importDefault(require("../models/SupportMessage"));
 const User_1 = __importDefault(require("../models/User"));
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
@@ -78,6 +78,33 @@ const adminFlagAddress = (req, res) => __awaiter(void 0, void 0, void 0, functio
     }
 });
 exports.adminFlagAddress = adminFlagAddress;
+// Admin: delete a flagged address
+const adminDeleteFlaggedAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { id } = req.params;
+        if (!id) {
+            return res.status(400).json({ message: 'Address ID is required' });
+        }
+        // Find and delete the flagged address
+        const deletedAddress = yield Address_1.default.findByIdAndDelete(id);
+        if (!deletedAddress) {
+            return res.status(404).json({ message: 'Flagged address not found' });
+        }
+        res.json({
+            message: 'Flagged address deleted successfully',
+            deletedAddress: {
+                id: deletedAddress._id,
+                address: deletedAddress.address,
+                coin: deletedAddress.coin,
+                network: deletedAddress.network
+            }
+        });
+    }
+    catch (err) {
+        res.status(500).json({ message: 'Failed to delete flagged address', error: err.message });
+    }
+});
+exports.adminDeleteFlaggedAddress = adminDeleteFlaggedAddress;
 // Send support email (admin -> support mailbox)
 const sendSupportEmail = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b, _c;

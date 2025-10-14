@@ -12,8 +12,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const db_1 = __importDefault(require("../config/db"));
 const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
 dotenv_1.default.config();
 const cryptoFeesData = [
@@ -62,7 +62,7 @@ function seedCryptoFees() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
             // Connect to MongoDB
-            yield mongoose_1.default.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ledgerswap');
+            yield (0, db_1.default)();
             console.log('Connected to MongoDB');
             // Clear existing crypto fees
             yield CryptoFee_1.default.deleteMany({});
@@ -77,10 +77,7 @@ function seedCryptoFees() {
         }
         catch (error) {
             console.error('❌ Error seeding crypto fees:', error);
-        }
-        finally {
-            yield mongoose_1.default.disconnect();
-            console.log('Disconnected from MongoDB');
+            throw error; // Re-throw for seedAll.ts to handle
         }
     });
 }

@@ -104,7 +104,7 @@ class RubicSwapService {
 
       return {
         success: true,
-        txHash: receipt.transactionHash,
+        txHash: receipt.transactionHash?.toString() || '',
         gasUsed: receipt.gasUsed?.toString(),
         amountOut: quote.amountOut
       };

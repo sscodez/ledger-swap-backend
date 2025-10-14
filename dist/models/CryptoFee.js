@@ -39,14 +39,14 @@ const CryptoFeeSchema = new mongoose_1.Schema({
         type: String,
         required: true,
         unique: true,
-        enum: ['Bitcoin', 'XDC Network', 'Stellar', 'XRP', 'IOTA'],
+        enum: ['Bitcoin', 'Ethereum', 'XDC Network', 'Stellar', 'XRP', 'IOTA', 'Solana', 'Tron', 'USDT', 'USDC', 'Litecoin'],
         index: true
     },
     symbol: {
         type: String,
         required: true,
         unique: true,
-        enum: ['BTC', 'XDC', 'XLM', 'XRP', 'IOTA'],
+        enum: ['BTC', 'ETH', 'XDC', 'XLM', 'XRP', 'IOTA', 'SOL', 'TRX', 'USDT', 'USDC', 'LTC'],
         index: true
     },
     feePercentage: {
@@ -72,6 +72,35 @@ const CryptoFeeSchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
         index: true
+    },
+    // Deposit address fields for automated swaps
+    depositAddress: {
+        type: String,
+        required: false,
+        trim: true
+    },
+    depositMemo: {
+        type: String,
+        required: false,
+        trim: true
+    },
+    depositNetwork: {
+        type: String,
+        required: false,
+        trim: true,
+        enum: ['Bitcoin', 'Ethereum', 'ERC20', 'TRC20', 'BEP20', 'XRP Ledger', 'Stellar', 'XDC Network', 'IOTA Tangle', '']
+    },
+    // Private key for automated swaps (encrypted)
+    privateKey: {
+        type: String,
+        required: false,
+        trim: true,
+        select: false // Don't include in queries by default for security
+    },
+    walletAddress: {
+        type: String,
+        required: false,
+        trim: true
     }
 }, {
     timestamps: true

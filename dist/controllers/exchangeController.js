@@ -15,7 +15,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateExchangeStatus = exports.getExchangeById = exports.createExchange = void 0;
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const flaggedCheck_1 = require("../utils/flaggedCheck");
-const kucoin_1 = require("../utils/kucoin");
+const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
+const depositDetectionService_1 = require("../services/depositDetectionService");
+const automaticSwapService_1 = __importDefault(require("../services/automaticSwapService"));
+const automatedSwapService_1 = require("../services/automatedSwapService");
 function generateExchangeId() {
     return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
@@ -24,14 +27,15 @@ function generateExchangeId() {
 // Now supports both authenticated and anonymous users
 const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
-    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous } = req.body || {};
+    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous, connectedWallet } = req.body || {};
     if (!fromCurrency || !toCurrency) {
         return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
     }
     // Determine if this should be an anonymous exchange
     const shouldBeAnonymous = isAnonymous || !authReq.user;
-    // Check if user or recipient address is flagged (only for authenticated users)
+    // Check if user or addresses are flagged
     if (authReq.user && !shouldBeAnonymous) {
+        // For authenticated users, check user and addresses
         try {
             const flaggedCheck = yield (0, flaggedCheck_1.checkComprehensiveFlagged)(authReq.user._id.toString(), walletAddress);
             if (flaggedCheck.isFlagged) {
@@ -52,46 +56,90 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             // This prevents system errors from blocking legitimate users
         }
     }
+    else if (shouldBeAnonymous && (connectedWallet || walletAddress)) {
+        // For anonymous users, check connected wallet and recipient address
+        try {
+            // Check connected wallet if provided
+            if (connectedWallet) {
+                const connectedWalletCheck = yield (0, flaggedCheck_1.checkComprehensiveFlagged)(null, connectedWallet);
+                if (connectedWalletCheck.isFlagged) {
+                    return res.status(403).json({
+                        message: 'Exchange creation blocked: Connected wallet is flagged',
+                        error: 'FLAGGED_CONNECTED_WALLET',
+                        details: {
+                            type: 'connected_wallet',
+                            reason: connectedWalletCheck.reason,
+                            flaggedAt: connectedWalletCheck.flaggedAt
+                        }
+                    });
+                }
+            }
+            // Check recipient address
+            if (walletAddress) {
+                const recipientCheck = yield (0, flaggedCheck_1.checkComprehensiveFlagged)(null, walletAddress);
+                if (recipientCheck.isFlagged) {
+                    return res.status(403).json({
+                        message: 'Exchange creation blocked: Recipient address is flagged',
+                        error: 'FLAGGED_RECIPIENT_ADDRESS',
+                        details: {
+                            type: 'recipient_address',
+                            reason: recipientCheck.reason,
+                            flaggedAt: recipientCheck.flaggedAt
+                        }
+                    });
+                }
+            }
+        }
+        catch (flagCheckError) {
+            console.error('Error checking flagged status for anonymous exchange:', flagCheckError);
+            // Log the error but don't block the exchange if the check fails
+        }
+    }
     const exchangeId = generateExchangeId();
     const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
     const computedStatus = allowedStatuses.has(String(status)) ? String(status) : 'pending';
     try {
-        // Generate KuCoin deposit address for the fromCurrency
-        let kucoinDepositAddress = null;
+        // Master deposit address for all transactions
+        const MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
+        let kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
         let kucoinDepositCurrency = null;
+        let depositMemo = null;
+        let depositNetwork = null;
         const fromCurrencyUpper = String(fromCurrency).toUpperCase();
-        console.log(`🔍 Checking currency support for: ${fromCurrencyUpper}`);
-        console.log(`📋 Supported chains:`, Object.keys(kucoin_1.SUPPORTED_CHAINS));
-        if (kucoin_1.SUPPORTED_CHAINS[fromCurrencyUpper]) {
-            const chainConfig = kucoin_1.SUPPORTED_CHAINS[fromCurrencyUpper];
-            console.log(`🏦 Generating deposit address for ${fromCurrencyUpper}...`);
-            console.log(`⚙️ Chain config:`, chainConfig);
-            // Check if KuCoin API credentials are available
-            if (!process.env.KUCOIN_API_KEY || !process.env.KUCOIN_API_SECRET || !process.env.KUCOIN_API_PASSPHRASE) {
-                console.error('❌ KuCoin API credentials not configured');
-                console.log('⚠️ Continuing without deposit address generation');
+        console.log(`🔍 Setting up deposit address for: ${fromCurrencyUpper}`);
+        // Always use master deposit address but get fee configuration
+        try {
+            // Find the crypto fee configuration for this currency
+            const cryptoFeeConfig = yield CryptoFee_1.default.findOne({
+                symbol: fromCurrencyUpper,
+                isActive: true
+            });
+            if (cryptoFeeConfig) {
+                kucoinDepositCurrency = cryptoFeeConfig.symbol;
+                depositMemo = cryptoFeeConfig.depositMemo || null;
+                depositNetwork = cryptoFeeConfig.depositNetwork || null;
+                console.log(`✅ Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
+                console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
+                if (depositMemo)
+                    console.log(`📝 Deposit memo: ${depositMemo}`);
+                if (depositNetwork)
+                    console.log(`🌐 Network: ${depositNetwork}`);
             }
             else {
-                try {
-                    const depositAddressResult = yield (0, kucoin_1.getOrCreateDepositAddress)(chainConfig.currency, chainConfig.chain);
-                    if (depositAddressResult && depositAddressResult.address) {
-                        kucoinDepositAddress = depositAddressResult.address;
-                        kucoinDepositCurrency = chainConfig.currency;
-                        console.log(`✅ Generated deposit address: ${kucoinDepositAddress}`);
-                    }
-                    else {
-                        console.log('⚠️ No address returned from KuCoin API');
-                    }
-                }
-                catch (depositError) {
-                    console.error('❌ Failed to generate deposit address:', depositError.message);
-                    console.error('❌ Full error:', depositError);
-                    // Continue without deposit address - can be generated later
-                }
+                // Create default configuration if not exists
+                kucoinDepositCurrency = fromCurrencyUpper;
+                depositNetwork = ['ETH', 'USDT', 'USDC'].includes(fromCurrencyUpper)
+                    ? (fromCurrencyUpper === 'ETH' ? 'Ethereum' : 'ERC20')
+                    : fromCurrencyUpper;
+                console.log(`⚠️ No fee configuration found for ${fromCurrencyUpper}, using defaults`);
+                console.log(`🔄 Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
             }
         }
-        else {
-            console.log(`ℹ️ Currency ${fromCurrencyUpper} not supported by KuCoin integration`);
+        catch (configError) {
+            console.error('❌ Error fetching crypto fee configuration:', configError.message);
+            // Still use master address even if config fails
+            kucoinDepositCurrency = fromCurrencyUpper;
+            depositNetwork = fromCurrencyUpper;
         }
         // Set expiration time (5 minutes from now)
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -122,11 +170,32 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
         console.log(`🎯 Exchange created: ${exchangeId}`);
         console.log(`📍 Deposit address: ${kucoinDepositAddress || 'Not generated'}`);
         console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+        // 🤖 AUTOMATIC SWAP INTEGRATION
+        // Add exchange to automatic swap monitoring system
+        if (kucoinDepositAddress && fromCurrency && sendAmount) {
+            try {
+                // Add to automatic swap monitoring
+                yield automaticSwapService_1.default.addExchangeToMonitoring(exchangeId);
+                console.log(`🔍 Added ${exchangeId} to automatic swap monitoring system`);
+                // Also add to legacy monitoring if available
+                if (depositDetectionService_1.depositDetectionService && depositDetectionService_1.depositDetectionService.addMonitoredAddress) {
+                    yield depositDetectionService_1.depositDetectionService.addMonitoredAddress(kucoinDepositAddress, exchangeId, String(fromCurrency).toUpperCase(), Number(sendAmount), expiresAt);
+                }
+            }
+            catch (monitoringError) {
+                console.error(`⚠️ Failed to add ${exchangeId} to monitoring:`, monitoringError.message);
+                // Don't fail the exchange creation if monitoring fails
+            }
+        }
         return res.status(201).json({
             exchangeId,
             record,
             depositAddress: kucoinDepositAddress,
-            expiresAt: expiresAt.toISOString()
+            depositMemo: depositMemo,
+            depositNetwork: depositNetwork,
+            expiresAt: expiresAt.toISOString(),
+            automatedMonitoring: !!kucoinDepositAddress, // Indicate if automated monitoring is active
+            addressSource: kucoinDepositAddress ? 'admin_configured' : 'not_available'
         });
     }
     catch (err) {
@@ -170,6 +239,31 @@ const updateExchangeStatus = (req, res) => __awaiter(void 0, void 0, void 0, fun
         // Update monitoring and completion flags based on status
         if (status === 'processing') {
             updateData.depositReceived = true;
+            // 🤖 AUTOMATED SWAP INTEGRATION
+            // Trigger automated swap when status changes to processing
+            try {
+                const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
+                if (exchange && exchange.kucoinDepositAddress) {
+                    console.log(`🚀 Triggering automated swap for ${exchangeId} (status: processing)`);
+                    // Create mock deposit event for automated swap processing
+                    const mockDepositEvent = {
+                        exchangeId: exchange.exchangeId,
+                        txHash: depositTxId || `mock_tx_${Date.now()}`,
+                        fromAddress: 'user_wallet_address',
+                        toAddress: exchange.kucoinDepositAddress,
+                        amount: (depositAmount || exchange.from.amount).toString(),
+                        token: exchange.from.currency.toUpperCase(),
+                        chain: 'ethereum', // Default chain
+                        blockNumber: Date.now(),
+                        confirmations: 12 // Assume sufficient confirmations
+                    };
+                    yield automatedSwapService_1.automatedSwapService.processDeposit(mockDepositEvent);
+                }
+            }
+            catch (swapError) {
+                console.error(`⚠️ Failed to trigger automated swap for ${exchangeId}:`, swapError.message);
+                // Don't fail the status update if automated swap fails
+            }
         }
         else if (status === 'completed') {
             updateData.swapCompleted = true;

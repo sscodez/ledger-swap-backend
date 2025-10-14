@@ -18,12 +18,20 @@ const mongoose_1 = __importDefault(require("mongoose"));
 // Get all blogs with pagination and filtering
 const getAllBlogs = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const authReq = req;
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const category = req.query.category;
-        const status = req.query.status || 'published';
         const search = req.query.search;
         const tag = req.query.tag;
+        // Determine status filter based on user role
+        const isAdmin = authReq.user && authReq.user.role === 'admin';
+        let status = req.query.status;
+        // If no status specified and user is not admin, default to published
+        if (!status && !isAdmin) {
+            status = 'published';
+        }
+        console.log(`Blog request from ${isAdmin ? 'admin' : 'public'} user, status filter: ${status || 'all'}`);
         const skip = (page - 1) * limit;
         // Build query
         const query = {};
@@ -43,6 +51,7 @@ const getAllBlogs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
                 { excerpt: { $regex: search, $options: 'i' } }
             ];
         }
+        console.log('Blog query:', query);
         const blogs = yield Blog_1.default.find(query)
             .populate('author', 'name email profilePicture')
             .sort({ publishedAt: -1, createdAt: -1 })
@@ -50,6 +59,7 @@ const getAllBlogs = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             .limit(limit)
             .lean();
         const total = yield Blog_1.default.countDocuments(query);
+        console.log(`Found ${blogs.length} blogs out of ${total} total`);
         res.json({
             success: true,
             data: {
@@ -101,17 +111,24 @@ const getBlogBySlug = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.getBlogBySlug = getBlogBySlug;
-// Get blog by ID (for admin)
+// Get blog by ID (with optional auth)
 const getBlogById = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const authReq = req;
         const { id } = req.params;
+        const isAdmin = authReq.user && authReq.user.role === 'admin';
         if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
             return res.status(400).json({
                 success: false,
                 message: 'Invalid blog ID'
             });
         }
-        const blog = yield Blog_1.default.findById(id)
+        // Build query based on user role
+        const query = { _id: id };
+        if (!isAdmin) {
+            query.status = 'published'; // Non-admin users can only see published blogs
+        }
+        const blog = yield Blog_1.default.findOne(query)
             .populate('author', 'name email profilePicture')
             .lean();
         if (!blog) {
