@@ -143,7 +143,7 @@ class AutomaticSwapService {
                     if (typeof tx === 'string')
                         continue; // Skip if tx is just hash
                     // Check ETH deposits to our master address
-                    if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0x0') {
+                    if (tx.to && tx.to.toLowerCase() === this.MASTER_DEPOSIT_ADDRESS.toLowerCase() && tx.value && tx.value !== '0x0' && tx.value !== '0') {
                         yield this.processDepositTransaction(tx, blockNumber, 'ETH');
                     }
                     // Check ERC20 token transfers to our master address
