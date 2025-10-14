@@ -6,7 +6,61 @@ dotenv.config();
 
 const DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
 
+// Focus on your primary trading tokens: XRP, XLM, XDC, IOTA
 const cryptoConfigurations = [
+  {
+    cryptocurrency: 'XRP',
+    symbol: 'XRP',
+    feePercentage: 0.5,
+    minimumFee: 1,
+    maximumFee: 10000,
+    isActive: true,
+    depositAddress: DEPOSIT_ADDRESS,
+    depositNetwork: 'Ethereum', // Wrapped XRP on Ethereum
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
+    isWrapped: true
+  },
+  {
+    cryptocurrency: 'Stellar',
+    symbol: 'XLM',
+    feePercentage: 0.5,
+    minimumFee: 1,
+    maximumFee: 10000,
+    isActive: true,
+    depositAddress: DEPOSIT_ADDRESS,
+    depositNetwork: 'Ethereum', // Wrapped XLM on Ethereum
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0x0F5D2fB29fb7d3CFeE444a200298f468908cC942',
+    isWrapped: true
+  },
+  {
+    cryptocurrency: 'XDC Network',
+    symbol: 'XDC',
+    feePercentage: 0.5,
+    minimumFee: 1,
+    maximumFee: 10000,
+    isActive: true,
+    depositAddress: DEPOSIT_ADDRESS,
+    depositNetwork: 'Ethereum', // Wrapped XDC on Ethereum
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2',
+    isWrapped: true
+  },
+  {
+    cryptocurrency: 'IOTA',
+    symbol: 'IOTA',
+    feePercentage: 0.5,
+    minimumFee: 1,
+    maximumFee: 10000,
+    isActive: true,
+    depositAddress: DEPOSIT_ADDRESS,
+    depositNetwork: 'BSC', // IOTA on BSC
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0x0000000000000000000000000000000000000000',
+    isWrapped: false
+  },
+  // Add ETH and USDT for trading pairs
   {
     cryptocurrency: 'Ethereum',
     symbol: 'ETH',
@@ -16,18 +70,9 @@ const cryptoConfigurations = [
     isActive: true,
     depositAddress: DEPOSIT_ADDRESS,
     depositNetwork: 'Ethereum',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'Bitcoin',
-    symbol: 'BTC',
-    feePercentage: 0.5,
-    minimumFee: 0.00001,
-    maximumFee: 1000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS, // Will be converted to BTC format in production
-    depositNetwork: 'Bitcoin',
-    walletAddress: DEPOSIT_ADDRESS
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0x0000000000000000000000000000000000000000',
+    isWrapped: false
   },
   {
     cryptocurrency: 'USDT',
@@ -38,62 +83,9 @@ const cryptoConfigurations = [
     isActive: true,
     depositAddress: DEPOSIT_ADDRESS,
     depositNetwork: 'ERC20',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'USDC',
-    symbol: 'USDC',
-    feePercentage: 0.5,
-    minimumFee: 1,
-    maximumFee: 10000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS,
-    depositNetwork: 'ERC20',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'XRP',
-    symbol: 'XRP',
-    feePercentage: 0.5,
-    minimumFee: 0.1,
-    maximumFee: 10000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS, // Will need XRP address in production
-    depositNetwork: 'XRP Ledger',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'Stellar',
-    symbol: 'XLM',
-    feePercentage: 0.5,
-    minimumFee: 0.1,
-    maximumFee: 10000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS, // Will need Stellar address in production
-    depositNetwork: 'Stellar',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'XDC Network',
-    symbol: 'XDC',
-    feePercentage: 0.5,
-    minimumFee: 1,
-    maximumFee: 10000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS,
-    depositNetwork: 'XDC Network',
-    walletAddress: DEPOSIT_ADDRESS
-  },
-  {
-    cryptocurrency: 'IOTA',
-    symbol: 'IOTA',
-    feePercentage: 0.5,
-    minimumFee: 1,
-    maximumFee: 10000,
-    isActive: true,
-    depositAddress: DEPOSIT_ADDRESS, // Will need IOTA address in production
-    depositNetwork: 'IOTA Tangle',
-    walletAddress: DEPOSIT_ADDRESS
+    walletAddress: DEPOSIT_ADDRESS,
+    tokenAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+    isWrapped: false
   }
 ];
 
