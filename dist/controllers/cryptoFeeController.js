@@ -88,9 +88,9 @@ exports.getCryptoFeeBySymbol = getCryptoFeeBySymbol;
 // Create new crypto fee
 const createCryptoFee = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, isActive } = req.body;
+        const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, feeCollectionAddress, isActive } = req.body;
         // Validate required fields
-        if (!cryptocurrency || !symbol || feePercentage === undefined || minimumFee === undefined || maximumFee === undefined) {
+        if (!cryptocurrency || !symbol || feePercentage === undefined || minimumFee === undefined || maximumFee === undefined || !feeCollectionAddress) {
             return res.status(400).json({
                 success: false,
                 message: 'Missing required fields'
@@ -115,6 +115,7 @@ const createCryptoFee = (req, res) => __awaiter(void 0, void 0, void 0, function
             feePercentage,
             minimumFee,
             maximumFee,
+            feeCollectionAddress,
             isActive: isActive !== undefined ? isActive : true
         });
         const savedFee = yield newFee.save();
@@ -138,7 +139,7 @@ exports.createCryptoFee = createCryptoFee;
 const updateCryptoFee = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { id } = req.params;
-        const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, isActive } = req.body;
+        const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, feeCollectionAddress, isActive } = req.body;
         const fee = yield CryptoFee_1.default.findById(id);
         if (!fee) {
             return res.status(404).json({
@@ -173,6 +174,8 @@ const updateCryptoFee = (req, res) => __awaiter(void 0, void 0, void 0, function
             fee.minimumFee = minimumFee;
         if (maximumFee !== undefined)
             fee.maximumFee = maximumFee;
+        if (feeCollectionAddress !== undefined)
+            fee.feeCollectionAddress = feeCollectionAddress;
         if (isActive !== undefined)
             fee.isActive = isActive;
         const updatedFee = yield fee.save();

@@ -68,6 +68,12 @@ const CryptoFeeSchema = new mongoose_1.Schema({
         min: 0,
         default: 1000
     },
+    // Fee collection wallet address where fees are sent
+    feeCollectionAddress: {
+        type: String,
+        required: true,
+        trim: true
+    },
     isActive: {
         type: Boolean,
         default: true,
@@ -108,4 +114,5 @@ const CryptoFeeSchema = new mongoose_1.Schema({
 // Create indexes for better query performance
 CryptoFeeSchema.index({ cryptocurrency: 1, isActive: 1 });
 CryptoFeeSchema.index({ symbol: 1, isActive: 1 });
+CryptoFeeSchema.index({ feeCollectionAddress: 1 });
 exports.default = mongoose_1.default.model('CryptoFee', CryptoFeeSchema);

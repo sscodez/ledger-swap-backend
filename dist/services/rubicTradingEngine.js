@@ -14,14 +14,44 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RubicTradingEngine = void 0;
 const rubic_sdk_1 = require("rubic-sdk");
+const ethers_1 = require("ethers");
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 class RubicTradingEngine {
     constructor() {
         this.sdk = null;
+        this.tradeCache = new Map();
+        this.walletProvider = null;
         this.config = this.createConfiguration();
+        this.initializeWallet();
+    }
+    /**
+     * Initialize wallet for trade execution
+     * In production, this should use a secure wallet management system
+     */
+    initializeWallet() {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            try {
+                const privateKey = process.env.SWAP_WALLET_PRIVATE_KEY;
+                if (privateKey && privateKey.length > 0) {
+                    // Use ethers v6 provider
+                    const rpcUrl = process.env.INFURA_ETHEREUM_RPC || 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161';
+                    const provider = new ethers_1.ethers.JsonRpcProvider(rpcUrl);
+                    this.walletProvider = new ethers_1.ethers.Wallet(privateKey, provider);
+                    console.log('✅ Wallet initialized for trade execution:', (_a = this.walletProvider) === null || _a === void 0 ? void 0 : _a.address);
+                }
+                else {
+                    console.warn('⚠️ No wallet private key configured. Trade execution will be simulated.');
+                }
+            }
+            catch (error) {
+                console.error('❌ Failed to initialize wallet:', error.message);
+                console.warn('⚠️ Continuing without wallet - trade execution will be simulated.');
+            }
+        });
     }
     createConfiguration() {
-        return {
+        const config = {
             rpcProviders: {
                 [rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM]: {
                     rpcList: [
@@ -30,11 +60,49 @@ class RubicTradingEngine {
                 },
                 [rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN]: {
                     rpcList: [
-                        'https://bsc-dataseed.binance.org/'
+                        'https://bsc-dataseed.binance.org/',
+                        'https://bsc-dataseed1.defibit.io/',
+                        'https://bsc-dataseed1.ninicoin.io/'
                     ]
+                },
+                [rubic_sdk_1.BLOCKCHAIN_NAME.POLYGON]: {
+                    rpcList: [
+                        'https://polygon-rpc.com/',
+                        'https://rpc-mainnet.matic.network'
+                    ]
+                },
+                [rubic_sdk_1.BLOCKCHAIN_NAME.ARBITRUM]: {
+                    rpcList: [
+                        'https://arb1.arbitrum.io/rpc'
+                    ]
+                }
+            },
+            // Provider addresses for fee collection
+            providerAddress: {
+                [rubic_sdk_1.CHAIN_TYPE.EVM]: {
+                    crossChain: process.env.RUBIC_CROSS_CHAIN_FEE_ADDRESS || '0x0000000000000000000000000000000000000000',
+                    onChain: process.env.RUBIC_ON_CHAIN_FEE_ADDRESS || '0x0000000000000000000000000000000000000000'
                 }
             }
         };
+        return config;
+    }
+    /**
+     * Update wallet provider for SDK
+     * Must be called after wallet is connected/changed
+     */
+    updateWalletProvider(address) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.sdk) {
+                throw new Error('SDK not initialized');
+            }
+            if (!this.walletProvider) {
+                throw new Error('Wallet not initialized');
+            }
+            // Update SDK with wallet provider
+            this.sdk.updateWalletAddress(rubic_sdk_1.CHAIN_TYPE.EVM, address);
+            console.log('✅ Wallet provider updated:', address);
+        });
     }
     initialize() {
         return __awaiter(this, void 0, void 0, function* () {
@@ -115,6 +183,14 @@ class RubicTradingEngine {
                     console.log('⚠️ No valid trades from Rubic (all errors), using fallback calculation');
                     return yield this.getFallbackQuote(fromToken, toToken, amount);
                 }
+                // Cache the trade for later execution
+                const tradeId = `${fromToken}-${toToken}-${amount}-${Date.now()}`;
+                this.tradeCache.set(tradeId, {
+                    trade: bestTrade,
+                    timestamp: Date.now()
+                });
+                // Clean old trades (older than 5 minutes)
+                this.cleanTradeCache();
                 return {
                     fromToken,
                     toToken,
@@ -125,6 +201,7 @@ class RubicTradingEngine {
                     route: [bestTrade.type],
                     provider: 'rubic',
                     tradeType: bestTrade.type,
+                    tradeId, // Return trade ID for execution
                     priceImpact: bestTrade.priceImpact ? parseFloat(bestTrade.priceImpact.toFixed(4)) : 0
                 };
             }
@@ -158,6 +235,14 @@ class RubicTradingEngine {
                     return yield this.getFallbackQuote(fromToken, toToken, amount);
                 }
                 const bestTrade = bestWrappedTrade.trade;
+                // Cache the trade for later execution
+                const tradeId = `${fromToken}-${toToken}-${amount}-${Date.now()}`;
+                this.tradeCache.set(tradeId, {
+                    trade: bestTrade,
+                    timestamp: Date.now()
+                });
+                // Clean old trades (older than 5 minutes)
+                this.cleanTradeCache();
                 return {
                     fromToken,
                     toToken,
@@ -168,6 +253,7 @@ class RubicTradingEngine {
                     route: [bestTrade.type],
                     provider: 'rubic-crosschain',
                     tradeType: bestTrade.type,
+                    tradeId, // Return trade ID for execution
                     priceImpact: bestTrade.priceImpact ? parseFloat(bestTrade.priceImpact.toFixed(4)) : 0
                 };
             }
@@ -213,38 +299,117 @@ class RubicTradingEngine {
             }
         });
     }
-    // Execute swap (simplified for backend - would need wallet integration)
-    executeSwap(exchangeId, quote) {
+    /**
+     * Clean old trades from cache (older than 5 minutes)
+     */
+    cleanTradeCache() {
+        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+        for (const [key, value] of this.tradeCache.entries()) {
+            if (value.timestamp < fiveMinutesAgo) {
+                this.tradeCache.delete(key);
+            }
+        }
+    }
+    /**
+     * Execute swap using actual Rubic SDK
+     * @param exchangeId - Exchange ID from database
+     * @param quote - Quote containing trade details and tradeId
+     * @param walletAddress - Optional wallet address for execution (defaults to configured wallet)
+     */
+    executeSwap(exchangeId, quote, walletAddress) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                // In a real implementation, this would execute the actual swap
-                // For now, we'll simulate the execution
-                const txHash = `0x${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
-                // Update exchange status
+                console.log(`🚀 Executing swap for exchange ${exchangeId}`);
+                // Check if we have a cached trade instance
+                const tradeId = quote.tradeId;
+                const cachedTrade = tradeId ? this.tradeCache.get(tradeId) : null;
+                if (!cachedTrade) {
+                    console.warn('⚠️ No cached trade found, will simulate execution');
+                    return yield this.simulateSwapExecution(exchangeId, quote);
+                }
+                // Check if wallet is configured
+                if (!this.walletProvider) {
+                    console.warn('⚠️ No wallet configured, will simulate execution');
+                    return yield this.simulateSwapExecution(exchangeId, quote);
+                }
+                // Update SDK with wallet provider if needed
+                const executionAddress = walletAddress || this.walletProvider.address;
+                if (this.sdk) {
+                    this.sdk.updateWalletAddress(rubic_sdk_1.CHAIN_TYPE.EVM, executionAddress);
+                }
+                // Update exchange status to processing
+                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, { status: 'processing' });
+                console.log(`💱 Executing trade with Rubic SDK...`);
+                console.log(`   Trade type: ${cachedTrade.trade.type}`);
+                console.log(`   From: ${quote.fromAmount} ${quote.fromToken}`);
+                console.log(`   To: ${quote.toAmount} ${quote.toToken}`);
+                // Execute the swap
+                const onConfirm = (hash) => {
+                    console.log(`✅ Transaction confirmed: ${hash}`);
+                };
+                // Execute the trade using Rubic SDK
+                const receipt = yield cachedTrade.trade.swap({ onConfirm });
+                // Receipt is a transaction hash string from Rubic SDK
+                const txHash = typeof receipt === 'string' ? receipt : (receipt === null || receipt === void 0 ? void 0 : receipt.transactionHash) || (receipt === null || receipt === void 0 ? void 0 : receipt.hash) || 'unknown';
+                console.log(`✅ Swap executed successfully: ${txHash}`);
+                // Update exchange with transaction hash
                 yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, {
-                    status: 'processing',
-                    kucoinOrderId: txHash
+                    kucoinOrderId: txHash,
+                    withdrawalTxId: txHash,
+                    status: 'completed',
+                    swapCompleted: true,
+                    monitoringActive: false
                 });
-                // Simulate processing time based on trade type
-                const processingTime = quote.tradeType.includes('CROSS_CHAIN') ? 30000 : 15000; // 30s for cross-chain, 15s for on-chain
-                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-                    yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, {
-                        status: 'completed',
-                        withdrawalTxId: txHash,
-                        swapCompleted: true,
-                        monitoringActive: false
-                    });
-                }), processingTime);
+                // Remove from cache after successful execution
+                if (tradeId) {
+                    this.tradeCache.delete(tradeId);
+                }
                 return {
                     txHash,
-                    status: 'pending'
+                    status: 'completed'
                 };
             }
             catch (error) {
-                // Update exchange as failed
-                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, { status: 'failed' });
+                console.error('❌ Swap execution failed:', error.message);
+                console.error('Full error:', error);
+                // Try to update exchange status to failed
+                try {
+                    yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, { status: 'failed' });
+                }
+                catch (dbError) {
+                    console.error('Failed to update exchange status:', dbError);
+                }
                 throw new Error(`Rubic swap execution failed: ${error.message}`);
             }
+        });
+    }
+    /**
+     * Simulate swap execution when real execution is not available
+     */
+    simulateSwapExecution(exchangeId, quote) {
+        return __awaiter(this, void 0, void 0, function* () {
+            var _a;
+            console.log('🎭 Simulating swap execution (no wallet/trade configured)');
+            const txHash = `0x${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+            // Update exchange status
+            yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, {
+                status: 'processing',
+                kucoinOrderId: txHash
+            });
+            // Simulate processing time based on trade type
+            const processingTime = ((_a = quote.tradeType) === null || _a === void 0 ? void 0 : _a.includes('CROSS_CHAIN')) ? 30000 : 15000; // 30s for cross-chain, 15s for on-chain
+            setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, {
+                    status: 'completed',
+                    withdrawalTxId: txHash,
+                    swapCompleted: true,
+                    monitoringActive: false
+                });
+            }), processingTime);
+            return {
+                txHash,
+                status: 'pending'
+            };
         });
     }
     // Helper function to get blockchain from token symbol

@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
 const rubicTradingEngine_1 = require("./rubicTradingEngine");
+const cryptoTransferService_1 = __importDefault(require("./cryptoTransferService"));
 const web3_1 = __importDefault(require("web3"));
 class AutomaticSwapService {
     constructor() {
@@ -62,10 +63,12 @@ class AutomaticSwapService {
                     symbol: exchange.from.currency.toUpperCase(),
                     isActive: true
                 });
-                // Enhanced fee calculation with min/max bounds
+                // Enhanced fee calculation with min/max bounds and fee collection address
                 let feePercentage = 0.5; // Default fallback
+                let feeCollectionAddress = '0x0000000000000000000000000000000000000000'; // Default fallback
                 if (feeConfig) {
                     feePercentage = feeConfig.feePercentage;
+                    feeCollectionAddress = feeConfig.feeCollectionAddress || '0x0000000000000000000000000000000000000000';
                     // Apply minimum and maximum fee constraints (using expected amount for calculation)
                     const expectedAmount = exchange.from.amount;
                     const calculatedFee = expectedAmount * (feePercentage / 100);
@@ -92,8 +95,8 @@ class AutomaticSwapService {
                 this.pendingExchanges.set(exchangeId, pendingExchange);
                 console.log(`🔍 Added exchange ${exchangeId} to automatic swap monitoring`);
                 console.log(`💰 Expected: ${pendingExchange.expectedAmount} ${pendingExchange.fromCurrency}`);
+                console.log(`💸 Fee: ${pendingExchange.feePercentage}% → ${feeCollectionAddress}`);
                 console.log(`📍 Deposit address: ${pendingExchange.depositAddress}`);
-                console.log(`💸 Fee: ${pendingExchange.feePercentage}%`);
                 // Start monitoring if not already running
                 if (!this.monitoringInterval) {
                     this.startEnhancedMonitoring();
@@ -361,11 +364,18 @@ class AutomaticSwapService {
                 console.log(`   Deposit: ${depositAmount} ${exchange.fromCurrency}`);
                 console.log(`   Target: ${exchange.toCurrency}`);
                 console.log(`   Recipient: ${exchange.recipientAddress}`);
+                // Get fee configuration to get collection address
+                const feeConfig = yield CryptoFee_1.default.findOne({
+                    symbol: exchange.fromCurrency.toUpperCase(),
+                    isActive: true
+                });
+                const feeCollectionAddress = (feeConfig === null || feeConfig === void 0 ? void 0 : feeConfig.feeCollectionAddress) || '0x0000000000000000000000000000000000000000';
                 // Calculate fees
                 const feeAmount = depositAmount * (exchange.feePercentage / 100);
                 const netAmount = depositAmount - feeAmount;
                 console.log(`💸 Fee deducted: ${feeAmount} ${exchange.fromCurrency} (${exchange.feePercentage}%)`);
                 console.log(`💵 Net amount for swap: ${netAmount} ${exchange.fromCurrency}`);
+                console.log(`💰 Fee collection address: ${feeCollectionAddress}`);
                 // Update exchange status to processing
                 yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: exchange.exchangeId }, {
                     status: 'processing',
@@ -373,9 +383,44 @@ class AutomaticSwapService {
                     depositAmount: depositAmount,
                     depositTxHash: txHash,
                     feeDeducted: feeAmount,
+                    feeCollectionAddress: feeCollectionAddress,
                     netAmount: netAmount,
                     processedAt: new Date()
                 });
+                // Send fee to collection address (if not zero address)
+                if (feeCollectionAddress && feeCollectionAddress !== '0x0000000000000000000000000000000000000000') {
+                    try {
+                        console.log(`💰 Sending fee ${feeAmount} ${exchange.fromCurrency} to ${feeCollectionAddress}`);
+                        // Transfer fee to collection address using crypto transfer service
+                        const transferResult = yield cryptoTransferService_1.default.transferFeeToCollection({
+                            fromCurrency: exchange.fromCurrency,
+                            feeAmount: feeAmount,
+                            feeCollectionAddress: feeCollectionAddress
+                        });
+                        if (transferResult.success && transferResult.txHash) {
+                            console.log(`✅ Fee transfer completed: ${transferResult.txHash}`);
+                            // Update exchange with fee transfer confirmation
+                            yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: exchange.exchangeId }, {
+                                feeTransferTxHash: transferResult.txHash,
+                                feeTransferConfirmed: true,
+                            });
+                        }
+                        else {
+                            throw new Error(transferResult.error || 'Fee transfer failed');
+                        }
+                    }
+                    catch (feeError) {
+                        console.error(`❌ Fee transfer failed:`, feeError.message);
+                        // If fee transfer fails, mark exchange as failed
+                        yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: exchange.exchangeId }, {
+                            status: 'failed',
+                            errorMessage: `Fee transfer failed: ${feeError.message}`,
+                            notes: 'Failed to transfer fee to collection address'
+                        });
+                        this.pendingExchanges.delete(exchange.exchangeId);
+                        return;
+                    }
+                }
                 // Check if Rubic SDK is ready
                 if (!this.rubicEngine) {
                     console.log('⚠️ Rubic SDK not available, marking for manual processing');
@@ -432,6 +477,7 @@ class AutomaticSwapService {
                     console.log(`   Deposit TX: ${txHash}`);
                     console.log(`   Swap TX: ${executionResult.txHash}`);
                     console.log(`   Fee deducted: ${feeAmount} ${exchange.fromCurrency}`);
+                    console.log(`   Fee sent to: ${feeCollectionAddress}`);
                     console.log(`   Net swapped: ${netAmount} ${exchange.fromCurrency}`);
                     console.log(`   Amount sent: ${quote.toAmount} ${exchange.toCurrency}`);
                     console.log(`   Trade type: ${quote.tradeType}`);

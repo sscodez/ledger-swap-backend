@@ -84,6 +84,24 @@ const exchangeHistorySchema = new mongoose_1.Schema({
         default: false,
         index: true, // Index for filtering anonymous vs authenticated exchanges
     },
+    // Fee Collection Fields
+    feeDeducted: {
+        type: Number,
+    },
+    feeCollectionAddress: {
+        type: String,
+        index: true,
+    },
+    feeTransferTxHash: {
+        type: String,
+    },
+    feeTransferConfirmed: {
+        type: Boolean,
+        default: false,
+    },
+    netAmount: {
+        type: Number,
+    },
     // KuCoin Integration Fields
     kucoinDepositAddress: {
         type: String,
@@ -115,6 +133,31 @@ const exchangeHistorySchema = new mongoose_1.Schema({
         index: true,
     },
     withdrawalTxId: {
+        type: String,
+    },
+    swapTxHash: {
+        type: String,
+        index: true,
+    },
+    amountOut: {
+        type: Number,
+    },
+    gasUsed: {
+        type: Number,
+    },
+    processedAt: {
+        type: Date,
+    },
+    completedAt: {
+        type: Date,
+    },
+    failedAt: {
+        type: Date,
+    },
+    errorMessage: {
+        type: String,
+    },
+    notes: {
         type: String,
     },
     expiresAt: {
