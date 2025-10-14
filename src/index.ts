@@ -24,6 +24,7 @@ import cryptoFeeRoutes from './routes/cryptoFeeRoutes';
 import contactRoutes from './routes/contactRoutes';
 import tradingRoutes from './routes/tradingRoutes';
 import automatedSwapRoutes from './routes/automatedSwapRoutes';
+import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
 import startAutomatedSwapSystem from './scripts/startAutomatedSwaps';
 
@@ -126,6 +127,7 @@ app.use('/api/crypto-fees', cryptoFeeRoutes);
 app.use('/api/contacts', contactRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/automated-swaps', automatedSwapRoutes);
+app.use('/api/flagged-check', flaggedCheckRoutes);
 
 async function start() {
   try {

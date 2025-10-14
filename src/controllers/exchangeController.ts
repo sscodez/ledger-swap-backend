@@ -16,7 +16,7 @@ function generateExchangeId() {
 // Now supports both authenticated and anonymous users
 export const createExchange: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous } = req.body || {};
+  const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous, connectedWallet } = req.body || {};
 
   if (!fromCurrency || !toCurrency) {
     return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
@@ -25,8 +25,9 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
   // Determine if this should be an anonymous exchange
   const shouldBeAnonymous = isAnonymous || !authReq.user;
 
-  // Check if user or recipient address is flagged (only for authenticated users)
+  // Check if user or addresses are flagged
   if (authReq.user && !shouldBeAnonymous) {
+    // For authenticated users, check user and addresses
     try {
       const flaggedCheck = await checkComprehensiveFlagged(
         authReq.user._id.toString(),
@@ -48,6 +49,44 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       console.error('Error checking flagged status:', flagCheckError);
       // Log the error but don't block the exchange if the check fails
       // This prevents system errors from blocking legitimate users
+    }
+  } else if (shouldBeAnonymous && (connectedWallet || walletAddress)) {
+    // For anonymous users, check connected wallet and recipient address
+    try {
+      // Check connected wallet if provided
+      if (connectedWallet) {
+        const connectedWalletCheck = await checkComprehensiveFlagged(null, connectedWallet);
+        if (connectedWalletCheck.isFlagged) {
+          return res.status(403).json({
+            message: 'Exchange creation blocked: Connected wallet is flagged',
+            error: 'FLAGGED_CONNECTED_WALLET',
+            details: {
+              type: 'connected_wallet',
+              reason: connectedWalletCheck.reason,
+              flaggedAt: connectedWalletCheck.flaggedAt
+            }
+          });
+        }
+      }
+
+      // Check recipient address
+      if (walletAddress) {
+        const recipientCheck = await checkComprehensiveFlagged(null, walletAddress);
+        if (recipientCheck.isFlagged) {
+          return res.status(403).json({
+            message: 'Exchange creation blocked: Recipient address is flagged',
+            error: 'FLAGGED_RECIPIENT_ADDRESS',
+            details: {
+              type: 'recipient_address',
+              reason: recipientCheck.reason,
+              flaggedAt: recipientCheck.flaggedAt
+            }
+          });
+        }
+      }
+    } catch (flagCheckError: any) {
+      console.error('Error checking flagged status for anonymous exchange:', flagCheckError);
+      // Log the error but don't block the exchange if the check fails
     }
   }
 

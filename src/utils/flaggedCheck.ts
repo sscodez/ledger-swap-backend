@@ -87,22 +87,24 @@ export const checkUserFlaggedAddresses = async (userId: string) => {
 
 /**
  * Comprehensive check for flagged status (user, address, and user's addresses)
- * @param userId - The user ID
+ * @param userId - The user ID (can be null for anonymous checks)
  * @param walletAddress - The wallet address (optional)
  * @returns Promise<{isFlagged: boolean, reason?: string, flaggedAt?: Date, type?: string}>
  */
-export const checkComprehensiveFlagged = async (userId: string, walletAddress?: string) => {
+export const checkComprehensiveFlagged = async (userId: string | null, walletAddress?: string) => {
   try {
-    // Check if user is flagged
-    const userCheck = await checkFlaggedUser(userId);
-    if (userCheck.isFlagged) {
-      return userCheck;
-    }
+    // Check if user is flagged (only if userId is provided)
+    if (userId) {
+      const userCheck = await checkFlaggedUser(userId);
+      if (userCheck.isFlagged) {
+        return userCheck;
+      }
 
-    // Check if user has any flagged addresses
-    const userAddressCheck = await checkUserFlaggedAddresses(userId);
-    if (userAddressCheck.isFlagged) {
-      return userAddressCheck;
+      // Check if user has any flagged addresses
+      const userAddressCheck = await checkUserFlaggedAddresses(userId);
+      if (userAddressCheck.isFlagged) {
+        return userAddressCheck;
+      }
     }
 
     // Check if the specific wallet address is flagged (if provided)
