@@ -124,6 +124,14 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       } else {
         console.log(`⚠️ No admin-configured deposit address found for ${fromCurrencyUpper}`);
         console.log(`💡 Admin needs to add deposit address at /admin/crypto-fees`);
+        
+        // Fallback: Use default deposit address for ETH-based tokens
+        if (['ETH', 'USDT', 'USDC'].includes(fromCurrencyUpper)) {
+          kucoinDepositAddress = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
+          kucoinDepositCurrency = fromCurrencyUpper;
+          depositNetwork = fromCurrencyUpper === 'ETH' ? 'Ethereum' : 'ERC20';
+          console.log(`🔄 Using fallback deposit address for ${fromCurrencyUpper}: ${kucoinDepositAddress}`);
+        }
       }
     } catch (configError: any) {
       console.error('❌ Error fetching crypto fee configuration:', configError.message);

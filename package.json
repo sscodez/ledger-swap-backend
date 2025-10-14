@@ -14,7 +14,8 @@
     "seed:crypto-fees": "ts-node-dev --transpile-only src/scripts/seedCryptoFees.ts",
     "seed:all": "ts-node-dev --transpile-only src/scripts/seedAll.ts",
     "seed": "npm run seed:all",
-    "start:automated-swaps": "ts-node-dev --transpile-only src/scripts/startAutomatedSwaps.ts"
+    "start:automated-swaps": "ts-node-dev --transpile-only src/scripts/startAutomatedSwaps.ts",
+    "setup:deposit-addresses": "ts-node-dev --transpile-only src/scripts/setupDepositAddresses.ts"
   },
   "keywords": [],
   "author": "",

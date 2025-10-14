@@ -23,14 +23,14 @@ const CryptoFeeSchema: Schema = new Schema({
     type: String,
     required: true,
     unique: true,
-    enum: ['Bitcoin', 'XDC Network', 'Stellar', 'XRP', 'IOTA'],
+    enum: ['Bitcoin', 'Ethereum', 'XDC Network', 'Stellar', 'XRP', 'IOTA', 'Solana', 'Tron', 'USDT', 'USDC', 'Litecoin'],
     index: true
   },
   symbol: {
     type: String,
     required: true,
     unique: true,
-    enum: ['BTC', 'XDC', 'XLM', 'XRP', 'IOTA'],
+    enum: ['BTC', 'ETH', 'XDC', 'XLM', 'XRP', 'IOTA', 'SOL', 'TRX', 'USDT', 'USDC', 'LTC'],
     index: true
   },
   feePercentage: {
