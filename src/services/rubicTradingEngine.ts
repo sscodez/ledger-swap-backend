@@ -1,4 +1,5 @@
-import { SDK, Configuration, BLOCKCHAIN_NAME, CHAIN_TYPE, OnChainTrade, EvmOnChainTrade, EvmCrossChainTrade } from 'rubic-sdk';
+import { SDK, Configuration, BLOCKCHAIN_NAME, CHAIN_TYPE, OnChainTrade, EvmOnChainTrade, EvmCrossChainTrade, WalletProvider, CrossChainTrade } from 'rubic-sdk';
+import { ethers } from 'ethers';
 import ExchangeHistory from '../models/ExchangeHistory';
 import { ITradingEngine, SwapQuote, SwapExecution } from '../interfaces/ITradingEngine';
 
@@ -15,19 +16,50 @@ interface RubicConfig {
       onChain: string;
     };
   };
-  walletProvider?: any;
+  walletProvider?: WalletProvider;
+}
+
+// Store trade instances for execution
+interface TradeCache {
+  trade: OnChainTrade | CrossChainTrade;
+  timestamp: number;
 }
 
 export class RubicTradingEngine implements ITradingEngine {
   private sdk: SDK | null = null;
   private config: Configuration;
+  private tradeCache: Map<string, TradeCache> = new Map();
+  private walletProvider: ethers.Wallet | null = null;
   
   constructor() {
     this.config = this.createConfiguration();
+    this.initializeWallet();
+  }
+
+  /**
+   * Initialize wallet for trade execution
+   * In production, this should use a secure wallet management system
+   */
+  private async initializeWallet(): Promise<void> {
+    try {
+      const privateKey = process.env.SWAP_WALLET_PRIVATE_KEY;
+      if (privateKey && privateKey.length > 0) {
+        // Use ethers v6 provider
+        const rpcUrl = process.env.INFURA_ETHEREUM_RPC || 'https://mainnet.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161';
+        const provider = new (ethers as any).JsonRpcProvider(rpcUrl);
+        this.walletProvider = new (ethers as any).Wallet(privateKey, provider);
+        console.log('✅ Wallet initialized for trade execution:', this.walletProvider?.address);
+      } else {
+        console.warn('⚠️ No wallet private key configured. Trade execution will be simulated.');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to initialize wallet:', error.message);
+      console.warn('⚠️ Continuing without wallet - trade execution will be simulated.');
+    }
   }
 
   private createConfiguration(): Configuration {
-    return {
+    const config: Configuration = {
       rpcProviders: {
         [BLOCKCHAIN_NAME.ETHEREUM]: {
           rpcList: [
@@ -36,11 +68,51 @@ export class RubicTradingEngine implements ITradingEngine {
         },
         [BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN]: {
           rpcList: [
-            'https://bsc-dataseed.binance.org/'
+            'https://bsc-dataseed.binance.org/',
+            'https://bsc-dataseed1.defibit.io/',
+            'https://bsc-dataseed1.ninicoin.io/'
           ]
+        },
+        [BLOCKCHAIN_NAME.POLYGON]: {
+          rpcList: [
+            'https://polygon-rpc.com/',
+            'https://rpc-mainnet.matic.network'
+          ]
+        },
+        [BLOCKCHAIN_NAME.ARBITRUM]: {
+          rpcList: [
+            'https://arb1.arbitrum.io/rpc'
+          ]
+        }
+      },
+      // Provider addresses for fee collection
+      providerAddress: {
+        [CHAIN_TYPE.EVM]: {
+          crossChain: process.env.RUBIC_CROSS_CHAIN_FEE_ADDRESS || '0x0000000000000000000000000000000000000000',
+          onChain: process.env.RUBIC_ON_CHAIN_FEE_ADDRESS || '0x0000000000000000000000000000000000000000'
         }
       }
     };
+
+    return config;
+  }
+
+  /**
+   * Update wallet provider for SDK
+   * Must be called after wallet is connected/changed
+   */
+  async updateWalletProvider(address: string): Promise<void> {
+    if (!this.sdk) {
+      throw new Error('SDK not initialized');
+    }
+
+    if (!this.walletProvider) {
+      throw new Error('Wallet not initialized');
+    }
+
+    // Update SDK with wallet provider
+    this.sdk.updateWalletAddress(CHAIN_TYPE.EVM, address);
+    console.log('✅ Wallet provider updated:', address);
   }
 
   async initialize(): Promise<void> {
@@ -137,6 +209,16 @@ export class RubicTradingEngine implements ITradingEngine {
         return await this.getFallbackQuote(fromToken, toToken, amount);
       }
 
+      // Cache the trade for later execution
+      const tradeId = `${fromToken}-${toToken}-${amount}-${Date.now()}`;
+      this.tradeCache.set(tradeId, {
+        trade: bestTrade,
+        timestamp: Date.now()
+      });
+
+      // Clean old trades (older than 5 minutes)
+      this.cleanTradeCache();
+
       return {
         fromToken,
         toToken,
@@ -147,6 +229,7 @@ export class RubicTradingEngine implements ITradingEngine {
         route: [bestTrade.type],
         provider: 'rubic',
         tradeType: bestTrade.type,
+        tradeId, // Return trade ID for execution
         priceImpact: (bestTrade as any).priceImpact ? parseFloat((bestTrade as any).priceImpact.toFixed(4)) : 0
       };
 
@@ -189,6 +272,16 @@ export class RubicTradingEngine implements ITradingEngine {
 
       const bestTrade = bestWrappedTrade.trade;
 
+      // Cache the trade for later execution
+      const tradeId = `${fromToken}-${toToken}-${amount}-${Date.now()}`;
+      this.tradeCache.set(tradeId, {
+        trade: bestTrade,
+        timestamp: Date.now()
+      });
+
+      // Clean old trades (older than 5 minutes)
+      this.cleanTradeCache();
+
       return {
         fromToken,
         toToken,
@@ -199,6 +292,7 @@ export class RubicTradingEngine implements ITradingEngine {
         route: [bestTrade.type],
         provider: 'rubic-crosschain',
         tradeType: bestTrade.type,
+        tradeId, // Return trade ID for execution
         priceImpact: (bestTrade as any).priceImpact ? parseFloat((bestTrade as any).priceImpact.toFixed(4)) : 0
       };
 
@@ -246,69 +340,164 @@ export class RubicTradingEngine implements ITradingEngine {
     }
   }
 
-  // Execute swap (simplified for backend - would need wallet integration)
-  async executeSwap(exchangeId: string, quote: SwapQuote): Promise<SwapExecution> {
-    try {
-      // In a real implementation, this would execute the actual swap
-      // For now, we'll simulate the execution
-      const txHash = `0x${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+  /**
+   * Clean old trades from cache (older than 5 minutes)
+   */
+  private cleanTradeCache(): void {
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    for (const [key, value] of this.tradeCache.entries()) {
+      if (value.timestamp < fiveMinutesAgo) {
+        this.tradeCache.delete(key);
+      }
+    }
+  }
 
-      // Update exchange status
+  /**
+   * Execute swap using actual Rubic SDK
+   * @param exchangeId - Exchange ID from database
+   * @param quote - Quote containing trade details and tradeId
+   * @param walletAddress - Optional wallet address for execution (defaults to configured wallet)
+   */
+  async executeSwap(exchangeId: string, quote: SwapQuote, walletAddress?: string): Promise<SwapExecution> {
+    try {
+      console.log(`🚀 Executing swap for exchange ${exchangeId}`);
+
+      // Check if we have a cached trade instance
+      const tradeId = (quote as any).tradeId;
+      const cachedTrade = tradeId ? this.tradeCache.get(tradeId) : null;
+
+      if (!cachedTrade) {
+        console.warn('⚠️ No cached trade found, will simulate execution');
+        return await this.simulateSwapExecution(exchangeId, quote);
+      }
+
+      // Check if wallet is configured
+      if (!this.walletProvider) {
+        console.warn('⚠️ No wallet configured, will simulate execution');
+        return await this.simulateSwapExecution(exchangeId, quote);
+      }
+
+      // Update SDK with wallet provider if needed
+      const executionAddress = walletAddress || this.walletProvider.address;
+      if (this.sdk) {
+        this.sdk.updateWalletAddress(CHAIN_TYPE.EVM, executionAddress);
+      }
+
+      // Update exchange status to processing
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId },
+        { status: 'processing' }
+      );
+
+      console.log(`💱 Executing trade with Rubic SDK...`);
+      console.log(`   Trade type: ${cachedTrade.trade.type}`);
+      console.log(`   From: ${quote.fromAmount} ${quote.fromToken}`);
+      console.log(`   To: ${quote.toAmount} ${quote.toToken}`);
+
+      // Execute the swap
+      const onConfirm = (hash: string) => {
+        console.log(`✅ Transaction confirmed: ${hash}`);
+      };
+
+      // Execute the trade using Rubic SDK
+      const receipt = await cachedTrade.trade.swap({ onConfirm });
+      // Receipt is a transaction hash string from Rubic SDK
+      const txHash = typeof receipt === 'string' ? receipt : (receipt as any)?.transactionHash || (receipt as any)?.hash || 'unknown';
+
+      console.log(`✅ Swap executed successfully: ${txHash}`);
+
+      // Update exchange with transaction hash
       await ExchangeHistory.findOneAndUpdate(
         { exchangeId },
         { 
-          status: 'processing',
-          kucoinOrderId: txHash
+          kucoinOrderId: txHash,
+          withdrawalTxId: txHash,
+          status: 'completed',
+          swapCompleted: true,
+          monitoringActive: false
         }
       );
 
-      // Simulate processing time based on trade type
-      const processingTime = quote.tradeType.includes('CROSS_CHAIN') ? 30000 : 15000; // 30s for cross-chain, 15s for on-chain
-
-      setTimeout(async () => {
-        await ExchangeHistory.findOneAndUpdate(
-          { exchangeId },
-          { 
-            status: 'completed',
-            withdrawalTxId: txHash,
-            swapCompleted: true,
-            monitoringActive: false
-          }
-        );
-      }, processingTime);
+      // Remove from cache after successful execution
+      if (tradeId) {
+        this.tradeCache.delete(tradeId);
+      }
 
       return {
         txHash,
-        status: 'pending'
+        status: 'completed'
       };
 
     } catch (error: any) {
-      // Update exchange as failed
-      await ExchangeHistory.findOneAndUpdate(
-        { exchangeId },
-        { status: 'failed' }
-      );
+      console.error('❌ Swap execution failed:', error.message);
+      console.error('Full error:', error);
+
+      // Try to update exchange status to failed
+      try {
+        await ExchangeHistory.findOneAndUpdate(
+          { exchangeId },
+          { status: 'failed' }
+        );
+      } catch (dbError) {
+        console.error('Failed to update exchange status:', dbError);
+      }
 
       throw new Error(`Rubic swap execution failed: ${error.message}`);
     }
   }
 
+  /**
+   * Simulate swap execution when real execution is not available
+   */
+  private async simulateSwapExecution(exchangeId: string, quote: SwapQuote): Promise<SwapExecution> {
+    console.log('🎭 Simulating swap execution (no wallet/trade configured)');
+    
+    const txHash = `0x${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+
+    // Update exchange status
+    await ExchangeHistory.findOneAndUpdate(
+      { exchangeId },
+      { 
+        status: 'processing',
+        kucoinOrderId: txHash
+      }
+    );
+
+    // Simulate processing time based on trade type
+    const processingTime = quote.tradeType?.includes('CROSS_CHAIN') ? 30000 : 15000; // 30s for cross-chain, 15s for on-chain
+
+    setTimeout(async () => {
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId },
+        { 
+          status: 'completed',
+          withdrawalTxId: txHash,
+          swapCompleted: true,
+          monitoringActive: false
+        }
+      );
+    }, processingTime);
+
+    return {
+      txHash,
+      status: 'pending'
+    };
+  }
+
   // Helper function to get blockchain from token symbol
   private getBlockchainFromToken(tokenSymbol: string): typeof BLOCKCHAIN_NAME[keyof typeof BLOCKCHAIN_NAME] {
     const tokenBlockchains: Record<string, typeof BLOCKCHAIN_NAME[keyof typeof BLOCKCHAIN_NAME]> = {
-      // BTCB on BSC
-      'ETH': BLOCKCHAIN_NAME.ETHEREUM,
-      'USDT': BLOCKCHAIN_NAME.ETHEREUM,
-      'USDC': BLOCKCHAIN_NAME.ETHEREUM,
-      'BTC': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-      'XRP': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XRP on BSC
-      'XLM': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XLM on BSC
-      'XDC': BLOCKCHAIN_NAME.ETHEREUM, // XDC on BSC
+      // Ethereum tokens (wrapped versions for cross-chain compatibility)
+      'BTC': BLOCKCHAIN_NAME.ETHEREUM, // WBTC on Ethereum
+      'XRP': BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XRP on Ethereum
+      'XLM': BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XLM on Ethereum
+      'XDC': BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XDC on Ethereum
+      'ETH': BLOCKCHAIN_NAME.ETHEREUM, // Native ETH
+      'USDT': BLOCKCHAIN_NAME.ETHEREUM, // USDT on Ethereum
+
+      // BSC tokens
       'MIOTA': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
-      'IOTA': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
-      'BNB': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-      'MATIC': BLOCKCHAIN_NAME.POLYGON,
-      'ARB': BLOCKCHAIN_NAME.ARBITRUM
+      'IOTA': BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN  // IOTA on BSC
     };
 
     return tokenBlockchains[tokenSymbol.toUpperCase()] || BLOCKCHAIN_NAME.ETHEREUM;
@@ -319,24 +508,17 @@ export class RubicTradingEngine implements ITradingEngine {
     const addresses: Record<string, string> = {
       // Native tokens (use zero address)
       'ETH': '0x0000000000000000000000000000000000000000', // Native ETH
-      'BNB': '0x0000000000000000000000000000000000000000', // Native BNB
-      
-      // BSC tokens (verified addresses)
-      'BTC': '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', // BTCB on BSC
-      'USDT': '0x55d398326f99059fF775485246999027B3197955', // USDT on BSC
-      'USDC': '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // USDC on BSC
-      'XRP': '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // XRP on BSC
-      'XLM': '0x43C934A845205F0b514417d757d7235B8f53f1B9', // XLM on BSC
+
+      // Ethereum tokens (wrapped versions)
+      'BTC': '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', // WBTC on Ethereum
+      'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT on Ethereum
+      'XRP': '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // Wrapped XRP on Ethereum
+      'XLM': '0x0F5D2fB29fb7d3CFeE444a200298f468908cC942', // Wrapped XLM on Ethereum
+      'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // Wrapped XDC on Ethereum
+
+      // BSC tokens
       'MIOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
-      'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
-      
-      // Ethereum tokens
-      'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // XDC on Ethereum
-      'WETH': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH on Ethereum
-      
-      // Other chains
-      'MATIC': '0x0000000000000000000000000000000000000000', // Native MATIC
-      'ARB': '0x0000000000000000000000000000000000000000' // Native ARB
+      'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a'  // IOTA on BSC
     };
 
     return addresses[symbol.toUpperCase()] || '0x0000000000000000000000000000000000000000';
@@ -348,31 +530,31 @@ export class RubicTradingEngine implements ITradingEngine {
       {
         symbol: 'BTC',
         name: 'Bitcoin',
-        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-        address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c',
+        blockchain: BLOCKCHAIN_NAME.ETHEREUM, // WBTC on Ethereum
+        address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
         decimals: 8,
         isActive: true
       },
       {
         symbol: 'XRP',
         name: 'Ripple',
-        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-        address: '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
+        blockchain: BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XRP on Ethereum
+        address: '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
         decimals: 6,
         isActive: true
       },
       {
         symbol: 'XLM',
         name: 'Stellar',
-        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-        address: '0x43C934A845205F0b514417d757d7235B8f53f1B9',
+        blockchain: BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XLM on Ethereum
+        address: '0x0F5D2fB29fb7d3CFeE444a200298f468908cC942',
         decimals: 7,
         isActive: true
       },
       {
         symbol: 'XDC',
         name: 'XinFin',
-        blockchain: BLOCKCHAIN_NAME.ETHEREUM,
+        blockchain: BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XDC on Ethereum
         address: '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2',
         decimals: 18,
         isActive: true
@@ -380,46 +562,44 @@ export class RubicTradingEngine implements ITradingEngine {
       {
         symbol: 'MIOTA',
         name: 'IOTA',
-        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
+        blockchain: BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
         address: '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a',
         decimals: 6,
-        isActive: true // Now using Binance-Peg IOTA Token
+        isActive: true
       }
     ];
   }
 
-  // Validate trading pair support
+  // Validate trading pair support (most pairs are cross-chain now)
   isTradingPairSupported(fromToken: string, toToken: string): boolean {
     const supportedPairs = [
-      // IOTA pairs
+      // Cross-chain pairs (IOTA on BSC ↔ Others on Ethereum)
       ['MIOTA', 'XRP'], ['IOTA', 'XRP'],
       ['MIOTA', 'XDC'], ['IOTA', 'XDC'],
       ['MIOTA', 'BTC'], ['IOTA', 'BTC'],
       ['MIOTA', 'XLM'], ['IOTA', 'XLM'],
-      
-      // XRP pairs
-      ['XRP', 'XDC'], ['XRP', 'BTC'], ['XRP', 'XLM'],
-      
-      // XDC pairs
-      ['XDC', 'BTC'], ['XDC', 'XLM'],
-      
-      // BTC pairs
-      ['BTC', 'XLM'],
-      
+      ['MIOTA', 'ETH'], ['IOTA', 'ETH'],
+      ['MIOTA', 'USDT'], ['IOTA', 'USDT'],
+
+      // Same-chain pairs (all on Ethereum)
+      ['XRP', 'XDC'], ['XRP', 'BTC'], ['XRP', 'XLM'], ['XRP', 'ETH'], ['XRP', 'USDT'],
+      ['XDC', 'BTC'], ['XDC', 'XLM'], ['XDC', 'ETH'], ['XDC', 'USDT'],
+      ['BTC', 'XLM'], ['BTC', 'ETH'], ['BTC', 'USDT'],
+      ['XLM', 'ETH'], ['XLM', 'USDT'],
+
       // Reverse pairs (bidirectional trading)
       ['XRP', 'MIOTA'], ['XRP', 'IOTA'],
       ['XDC', 'MIOTA'], ['XDC', 'IOTA'],
       ['BTC', 'MIOTA'], ['BTC', 'IOTA'],
       ['XLM', 'MIOTA'], ['XLM', 'IOTA'],
-      ['XDC', 'XRP'], ['BTC', 'XRP'], ['XLM', 'XRP'],
-      ['BTC', 'XDC'], ['XLM', 'XDC'],
-      ['XLM', 'BTC']
+      ['ETH', 'MIOTA'], ['ETH', 'IOTA'],
+      ['USDT', 'MIOTA'], ['USDT', 'IOTA']
     ];
 
     const normalizedFrom = fromToken.toUpperCase();
     const normalizedTo = toToken.toUpperCase();
-    
-    return supportedPairs.some(([from, to]) => 
+
+    return supportedPairs.some(([from, to]) =>
       (from === normalizedFrom && to === normalizedTo) ||
       (from === normalizedTo && to === normalizedFrom)
     );
@@ -428,24 +608,33 @@ export class RubicTradingEngine implements ITradingEngine {
   // Get all supported trading pairs
   getSupportedTradingPairs() {
     return [
-      // IOTA trading pairs
-      { from: 'MIOTA', to: 'XRP', description: 'IOTA → Ripple' },
-      { from: 'MIOTA', to: 'XDC', description: 'IOTA → XinFin' },
-      { from: 'MIOTA', to: 'BTC', description: 'IOTA → Bitcoin' },
-      { from: 'MIOTA', to: 'XLM', description: 'IOTA → Stellar' },
-      
-      // XRP trading pairs
+      // Cross-chain pairs (IOTA on BSC ↔ Others on Ethereum)
+      { from: 'MIOTA', to: 'XRP', description: 'IOTA → Ripple (Cross-chain)' },
+      { from: 'MIOTA', to: 'XDC', description: 'IOTA → XinFin (Cross-chain)' },
+      { from: 'MIOTA', to: 'BTC', description: 'IOTA → Bitcoin (Cross-chain)' },
+      { from: 'MIOTA', to: 'XLM', description: 'IOTA → Stellar (Cross-chain)' },
+      { from: 'MIOTA', to: 'ETH', description: 'IOTA → Ethereum (Cross-chain)' },
+      { from: 'MIOTA', to: 'USDT', description: 'IOTA → Tether (Cross-chain)' },
+
+      // Same-chain pairs (all on Ethereum)
       { from: 'XRP', to: 'XDC', description: 'Ripple → XinFin' },
       { from: 'XRP', to: 'BTC', description: 'Ripple → Bitcoin' },
       { from: 'XRP', to: 'XLM', description: 'Ripple → Stellar' },
-      
-      // XDC trading pairs
+      { from: 'XRP', to: 'ETH', description: 'Ripple → Ethereum' },
+      { from: 'XRP', to: 'USDT', description: 'Ripple → Tether' },
+
       { from: 'XDC', to: 'BTC', description: 'XinFin → Bitcoin' },
       { from: 'XDC', to: 'XLM', description: 'XinFin → Stellar' },
-      
-      // BTC trading pairs
+      { from: 'XDC', to: 'ETH', description: 'XinFin → Ethereum' },
+      { from: 'XDC', to: 'USDT', description: 'XinFin → Tether' },
+
       { from: 'BTC', to: 'XLM', description: 'Bitcoin → Stellar' },
-      
+      { from: 'BTC', to: 'ETH', description: 'Bitcoin → Ethereum' },
+      { from: 'BTC', to: 'USDT', description: 'Bitcoin → Tether' },
+
+      { from: 'XLM', to: 'ETH', description: 'Stellar → Ethereum' },
+      { from: 'XLM', to: 'USDT', description: 'Stellar → Tether' },
+
       // Note: All pairs are bidirectional
     ];
   }

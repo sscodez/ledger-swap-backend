@@ -76,10 +76,10 @@ export const getCryptoFeeBySymbol = async (req: Request, res: Response) => {
 // Create new crypto fee
 export const createCryptoFee = async (req: Request, res: Response) => {
   try {
-    const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, isActive } = req.body;
+    const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, feeCollectionAddress, isActive } = req.body;
 
     // Validate required fields
-    if (!cryptocurrency || !symbol || feePercentage === undefined || minimumFee === undefined || maximumFee === undefined) {
+    if (!cryptocurrency || !symbol || feePercentage === undefined || minimumFee === undefined || maximumFee === undefined || !feeCollectionAddress) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields'
@@ -107,6 +107,7 @@ export const createCryptoFee = async (req: Request, res: Response) => {
       feePercentage,
       minimumFee,
       maximumFee,
+      feeCollectionAddress,
       isActive: isActive !== undefined ? isActive : true
     });
 
@@ -131,7 +132,7 @@ export const createCryptoFee = async (req: Request, res: Response) => {
 export const updateCryptoFee = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, isActive } = req.body;
+    const { cryptocurrency, symbol, feePercentage, minimumFee, maximumFee, feeCollectionAddress, isActive } = req.body;
 
     const fee = await CryptoFee.findById(id);
     if (!fee) {
@@ -165,6 +166,7 @@ export const updateCryptoFee = async (req: Request, res: Response) => {
     if (feePercentage !== undefined) fee.feePercentage = feePercentage;
     if (minimumFee !== undefined) fee.minimumFee = minimumFee;
     if (maximumFee !== undefined) fee.maximumFee = maximumFee;
+    if (feeCollectionAddress !== undefined) fee.feeCollectionAddress = feeCollectionAddress;
     if (isActive !== undefined) fee.isActive = isActive;
 
     const updatedFee = await fee.save();

@@ -9,6 +9,7 @@ export interface SwapQuote {
   route: any[];
   provider: string;
   tradeType: string;
+  tradeId?: string; // Optional trade ID for caching
   priceImpact: number;
 }
 

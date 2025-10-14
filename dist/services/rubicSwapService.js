@@ -37,9 +37,6 @@ class RubicSwapService {
             }
         });
     }
-    /**
-     * Execute a cross-chain or same-chain swap using Rubic
-     */
     executeSwap(params) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a, _b;
@@ -47,19 +44,23 @@ class RubicSwapService {
                 if (!this.isInitialized || !this.web3) {
                     throw new Error('Rubic service not initialized');
                 }
-                console.log('🔄 Executing Rubic swap:', {
-                    from: params.fromToken,
-                    to: params.toToken,
-                    fromAddress: params.fromAddress,
-                    toAddress: params.toAddress
-                });
-                console.log('🔄 Executing Rubic swap for your trading tokens...');
-                // Get quote from Rubic API
+                console.log('🔄 Executing enhanced Rubic swap for your trading tokens...');
+                console.log(`💱 ${params.amount} ${params.fromToken} → ${params.toToken}`);
+                console.log(`📍 From: ${params.fromAddress} → To: ${params.toAddress}`);
+                // Validate inputs
+                if (!params.fromToken || !params.toToken || !params.amount || !params.fromAddress || !params.toAddress || !params.privateKey) {
+                    throw new Error('Missing required swap parameters');
+                }
+                if (params.amount <= 0) {
+                    throw new Error('Invalid swap amount');
+                }
+                // Get quote from Rubic API with enhanced error handling
                 const quote = yield this.getRubicQuote(params);
                 if (!quote) {
-                    throw new Error('No swap route available');
+                    throw new Error('No swap route available - insufficient liquidity or invalid pair');
                 }
-                // Execute swap transaction
+                console.log(`📊 Quote received: ${quote.amountOut} ${params.toToken} output`);
+                // Enhanced transaction building with better gas estimation
                 const account = this.web3.eth.accounts.privateKeyToAccount(params.privateKey);
                 this.web3.eth.accounts.wallet.add(account);
                 const tx = {
@@ -67,29 +68,54 @@ class RubicSwapService {
                     to: quote.to,
                     data: quote.data,
                     value: quote.value || '0',
-                    gas: quote.gasLimit,
-                    gasPrice: quote.gasPrice
+                    gas: quote.gasLimit || '200000',
+                    gasPrice: quote.gasPrice || this.web3.utils.toWei('20', 'gwei')
                 };
-                console.log(`🚀 Sending ${params.fromToken} → ${params.toToken} swap transaction...`);
-                const receipt = yield this.web3.eth.sendTransaction(tx);
+                console.log(`🚀 Broadcasting ${params.fromToken} → ${params.toToken} swap transaction...`);
+                console.log(`⛽ Gas: ${tx.gas}, Price: ${this.web3.utils.fromWei(tx.gasPrice, 'gwei')} gwei`);
+                // Execute transaction with timeout and enhanced error handling
+                const receipt = yield Promise.race([
+                    this.web3.eth.sendTransaction(tx),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Transaction timeout - network congestion')), 300000) // 5 minute timeout
+                    )
+                ]);
+                console.log(`✅ Swap transaction confirmed: ${receipt.transactionHash}`);
                 return {
                     success: true,
                     txHash: ((_a = receipt.transactionHash) === null || _a === void 0 ? void 0 : _a.toString()) || '',
-                    gasUsed: (_b = receipt.gasUsed) === null || _b === void 0 ? void 0 : _b.toString(),
+                    gasUsed: ((_b = receipt.gasUsed) === null || _b === void 0 ? void 0 : _b.toString()) || '0',
                     amountOut: quote.amountOut
                 };
             }
             catch (error) {
-                console.error('❌ Rubic swap failed:', error.message);
+                console.error('❌ Enhanced Rubic swap failed:', error.message);
+                // Enhanced error categorization
+                if (error.message.includes('insufficient funds')) {
+                    return {
+                        success: false,
+                        error: 'Insufficient funds in wallet for gas fees'
+                    };
+                }
+                else if (error.message.includes('timeout')) {
+                    return {
+                        success: false,
+                        error: 'Transaction timeout - network congestion or low gas price'
+                    };
+                }
+                else if (error.message.includes('reverted')) {
+                    return {
+                        success: false,
+                        error: 'Transaction reverted - insufficient liquidity or slippage too high'
+                    };
+                }
                 return {
                     success: false,
-                    error: error.message
+                    error: error.message || 'Enhanced Rubic swap execution failed'
                 };
             }
         });
     }
     /**
-     * Get token information for supported cryptocurrencies
      */
     getTokenInfo(fromToken, toToken) {
         // Your primary trading tokens with correct addresses

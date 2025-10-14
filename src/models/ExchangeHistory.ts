@@ -12,7 +12,14 @@ export interface IExchangeHistory extends Document {
   walletAddress?: string;
   network?: string;
   isAnonymous?: boolean; // Track if this is an anonymous exchange
-  
+
+  // Fee Collection Fields
+  feeDeducted?: number; // Amount of fee deducted
+  feeCollectionAddress?: string; // Admin wallet address where fees are sent
+  feeTransferTxHash?: string; // Transaction hash of fee transfer
+  feeTransferConfirmed?: boolean; // Whether fee transfer was confirmed
+  netAmount?: number; // Amount after fee deduction (for swap)
+
   // KuCoin Integration Fields
   kucoinDepositAddress?: string; // Generated deposit address for this exchange
   kucoinDepositCurrency?: string; // Currency for the deposit address
@@ -22,6 +29,14 @@ export interface IExchangeHistory extends Document {
   depositTxId?: string; // Transaction ID of the deposit
   swapCompleted?: boolean; // Whether the swap has been completed
   withdrawalTxId?: string; // Transaction ID of the withdrawal
+  swapTxHash?: string; // Transaction hash of the swap
+  amountOut?: number; // Actual amount received after swap
+  gasUsed?: number; // Gas used for the swap transaction
+  processedAt?: Date; // When processing started
+  completedAt?: Date; // When swap completed
+  failedAt?: Date; // When swap failed
+  errorMessage?: string; // Error message if failed
+  notes?: string; // Additional notes
   expiresAt?: Date; // When this exchange expires (5 minutes from creation)
   monitoringActive?: boolean; // Whether this exchange is being monitored
   createdAt: Date; // Added by timestamps: true
@@ -78,7 +93,26 @@ const exchangeHistorySchema: Schema = new Schema({
     default: false,
     index: true, // Index for filtering anonymous vs authenticated exchanges
   },
-  
+
+  // Fee Collection Fields
+  feeDeducted: {
+    type: Number,
+  },
+  feeCollectionAddress: {
+    type: String,
+    index: true,
+  },
+  feeTransferTxHash: {
+    type: String,
+  },
+  feeTransferConfirmed: {
+    type: Boolean,
+    default: false,
+  },
+  netAmount: {
+    type: Number,
+  },
+
   // KuCoin Integration Fields
   kucoinDepositAddress: {
     type: String,
@@ -110,6 +144,31 @@ const exchangeHistorySchema: Schema = new Schema({
     index: true,
   },
   withdrawalTxId: {
+    type: String,
+  },
+  swapTxHash: {
+    type: String,
+    index: true,
+  },
+  amountOut: {
+    type: Number,
+  },
+  gasUsed: {
+    type: Number,
+  },
+  processedAt: {
+    type: Date,
+  },
+  completedAt: {
+    type: Date,
+  },
+  failedAt: {
+    type: Date,
+  },
+  errorMessage: {
+    type: String,
+  },
+  notes: {
     type: String,
   },
   expiresAt: {

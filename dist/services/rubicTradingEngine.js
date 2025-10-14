@@ -250,19 +250,16 @@ class RubicTradingEngine {
     // Helper function to get blockchain from token symbol
     getBlockchainFromToken(tokenSymbol) {
         const tokenBlockchains = {
-            // BTCB on BSC
-            'ETH': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM,
-            'USDT': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM,
-            'USDC': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM,
-            'BTC': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-            'XRP': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XRP on BSC
-            'XLM': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // XLM on BSC
-            'XDC': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // XDC on BSC
+            // Ethereum tokens (wrapped versions for cross-chain compatibility)
+            'BTC': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // WBTC on Ethereum
+            'XRP': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XRP on Ethereum
+            'XLM': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XLM on Ethereum
+            'XDC': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XDC on Ethereum
+            'ETH': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Native ETH
+            'USDT': rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // USDT on Ethereum
+            // BSC tokens
             'MIOTA': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
-            'IOTA': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
-            'BNB': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-            'MATIC': rubic_sdk_1.BLOCKCHAIN_NAME.POLYGON,
-            'ARB': rubic_sdk_1.BLOCKCHAIN_NAME.ARBITRUM
+            'IOTA': rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN // IOTA on BSC
         };
         return tokenBlockchains[tokenSymbol.toUpperCase()] || rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM;
     }
@@ -271,21 +268,15 @@ class RubicTradingEngine {
         const addresses = {
             // Native tokens (use zero address)
             'ETH': '0x0000000000000000000000000000000000000000', // Native ETH
-            'BNB': '0x0000000000000000000000000000000000000000', // Native BNB
-            // BSC tokens (verified addresses)
-            'BTC': '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c', // BTCB on BSC
-            'USDT': '0x55d398326f99059fF775485246999027B3197955', // USDT on BSC
-            'USDC': '0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d', // USDC on BSC
-            'XRP': '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // XRP on BSC
-            'XLM': '0x43C934A845205F0b514417d757d7235B8f53f1B9', // XLM on BSC
+            // Ethereum tokens (wrapped versions)
+            'BTC': '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', // WBTC on Ethereum
+            'USDT': '0xdAC17F958D2ee523a2206206994597C13D831ec7', // USDT on Ethereum
+            'XRP': '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE', // Wrapped XRP on Ethereum
+            'XLM': '0x0F5D2fB29fb7d3CFeE444a200298f468908cC942', // Wrapped XLM on Ethereum
+            'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // Wrapped XDC on Ethereum
+            // BSC tokens
             'MIOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
-            'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a', // IOTA on BSC
-            // Ethereum tokens
-            'XDC': '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2', // XDC on Ethereum
-            'WETH': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH on Ethereum
-            // Other chains
-            'MATIC': '0x0000000000000000000000000000000000000000', // Native MATIC
-            'ARB': '0x0000000000000000000000000000000000000000' // Native ARB
+            'IOTA': '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a' // IOTA on BSC
         };
         return addresses[symbol.toUpperCase()] || '0x0000000000000000000000000000000000000000';
     }
@@ -295,31 +286,31 @@ class RubicTradingEngine {
             {
                 symbol: 'BTC',
                 name: 'Bitcoin',
-                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-                address: '0x7130d2A12B9BCbFAe4f2634d864A1Ee1Ce3Ead9c',
+                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // WBTC on Ethereum
+                address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
                 decimals: 8,
                 isActive: true
             },
             {
                 symbol: 'XRP',
                 name: 'Ripple',
-                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-                address: '0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
+                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XRP on Ethereum
+                address: '0x1d2F0da169ceB9fC7B3144628dB156f3F6c60dBE',
                 decimals: 6,
                 isActive: true
             },
             {
                 symbol: 'XLM',
                 name: 'Stellar',
-                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
-                address: '0x43C934A845205F0b514417d757d7235B8f53f1B9',
+                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XLM on Ethereum
+                address: '0x0F5D2fB29fb7d3CFeE444a200298f468908cC942',
                 decimals: 7,
                 isActive: true
             },
             {
                 symbol: 'XDC',
                 name: 'XinFin',
-                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM,
+                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.ETHEREUM, // Wrapped XDC on Ethereum
                 address: '0x41AB1b6fcbB2fA9DCEd81aCbdeC13Ea6315F2Bf2',
                 decimals: 18,
                 isActive: true
@@ -327,35 +318,35 @@ class RubicTradingEngine {
             {
                 symbol: 'MIOTA',
                 name: 'IOTA',
-                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN,
+                blockchain: rubic_sdk_1.BLOCKCHAIN_NAME.BINANCE_SMART_CHAIN, // IOTA on BSC
                 address: '0x0b3F868E0BE5597D5DB7fEB59E1CADBb0fdDa50a',
                 decimals: 6,
-                isActive: true // Now using Binance-Peg IOTA Token
+                isActive: true
             }
         ];
     }
-    // Validate trading pair support
+    // Validate trading pair support (most pairs are cross-chain now)
     isTradingPairSupported(fromToken, toToken) {
         const supportedPairs = [
-            // IOTA pairs
+            // Cross-chain pairs (IOTA on BSC ↔ Others on Ethereum)
             ['MIOTA', 'XRP'], ['IOTA', 'XRP'],
             ['MIOTA', 'XDC'], ['IOTA', 'XDC'],
             ['MIOTA', 'BTC'], ['IOTA', 'BTC'],
             ['MIOTA', 'XLM'], ['IOTA', 'XLM'],
-            // XRP pairs
-            ['XRP', 'XDC'], ['XRP', 'BTC'], ['XRP', 'XLM'],
-            // XDC pairs
-            ['XDC', 'BTC'], ['XDC', 'XLM'],
-            // BTC pairs
-            ['BTC', 'XLM'],
+            ['MIOTA', 'ETH'], ['IOTA', 'ETH'],
+            ['MIOTA', 'USDT'], ['IOTA', 'USDT'],
+            // Same-chain pairs (all on Ethereum)
+            ['XRP', 'XDC'], ['XRP', 'BTC'], ['XRP', 'XLM'], ['XRP', 'ETH'], ['XRP', 'USDT'],
+            ['XDC', 'BTC'], ['XDC', 'XLM'], ['XDC', 'ETH'], ['XDC', 'USDT'],
+            ['BTC', 'XLM'], ['BTC', 'ETH'], ['BTC', 'USDT'],
+            ['XLM', 'ETH'], ['XLM', 'USDT'],
             // Reverse pairs (bidirectional trading)
             ['XRP', 'MIOTA'], ['XRP', 'IOTA'],
             ['XDC', 'MIOTA'], ['XDC', 'IOTA'],
             ['BTC', 'MIOTA'], ['BTC', 'IOTA'],
             ['XLM', 'MIOTA'], ['XLM', 'IOTA'],
-            ['XDC', 'XRP'], ['BTC', 'XRP'], ['XLM', 'XRP'],
-            ['BTC', 'XDC'], ['XLM', 'XDC'],
-            ['XLM', 'BTC']
+            ['ETH', 'MIOTA'], ['ETH', 'IOTA'],
+            ['USDT', 'MIOTA'], ['USDT', 'IOTA']
         ];
         const normalizedFrom = fromToken.toUpperCase();
         const normalizedTo = toToken.toUpperCase();
@@ -365,20 +356,28 @@ class RubicTradingEngine {
     // Get all supported trading pairs
     getSupportedTradingPairs() {
         return [
-            // IOTA trading pairs
-            { from: 'MIOTA', to: 'XRP', description: 'IOTA → Ripple' },
-            { from: 'MIOTA', to: 'XDC', description: 'IOTA → XinFin' },
-            { from: 'MIOTA', to: 'BTC', description: 'IOTA → Bitcoin' },
-            { from: 'MIOTA', to: 'XLM', description: 'IOTA → Stellar' },
-            // XRP trading pairs
+            // Cross-chain pairs (IOTA on BSC ↔ Others on Ethereum)
+            { from: 'MIOTA', to: 'XRP', description: 'IOTA → Ripple (Cross-chain)' },
+            { from: 'MIOTA', to: 'XDC', description: 'IOTA → XinFin (Cross-chain)' },
+            { from: 'MIOTA', to: 'BTC', description: 'IOTA → Bitcoin (Cross-chain)' },
+            { from: 'MIOTA', to: 'XLM', description: 'IOTA → Stellar (Cross-chain)' },
+            { from: 'MIOTA', to: 'ETH', description: 'IOTA → Ethereum (Cross-chain)' },
+            { from: 'MIOTA', to: 'USDT', description: 'IOTA → Tether (Cross-chain)' },
+            // Same-chain pairs (all on Ethereum)
             { from: 'XRP', to: 'XDC', description: 'Ripple → XinFin' },
             { from: 'XRP', to: 'BTC', description: 'Ripple → Bitcoin' },
             { from: 'XRP', to: 'XLM', description: 'Ripple → Stellar' },
-            // XDC trading pairs
+            { from: 'XRP', to: 'ETH', description: 'Ripple → Ethereum' },
+            { from: 'XRP', to: 'USDT', description: 'Ripple → Tether' },
             { from: 'XDC', to: 'BTC', description: 'XinFin → Bitcoin' },
             { from: 'XDC', to: 'XLM', description: 'XinFin → Stellar' },
-            // BTC trading pairs
+            { from: 'XDC', to: 'ETH', description: 'XinFin → Ethereum' },
+            { from: 'XDC', to: 'USDT', description: 'XinFin → Tether' },
             { from: 'BTC', to: 'XLM', description: 'Bitcoin → Stellar' },
+            { from: 'BTC', to: 'ETH', description: 'Bitcoin → Ethereum' },
+            { from: 'BTC', to: 'USDT', description: 'Bitcoin → Tether' },
+            { from: 'XLM', to: 'ETH', description: 'Stellar → Ethereum' },
+            { from: 'XLM', to: 'USDT', description: 'Stellar → Tether' },
             // Note: All pairs are bidirectional
         ];
     }

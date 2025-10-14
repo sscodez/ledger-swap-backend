@@ -7,6 +7,8 @@ export interface ICryptoFee extends Document {
   minimumFee: number;
   maximumFee: number;
   isActive: boolean;
+  // Fee collection wallet address where fees are sent
+  feeCollectionAddress: string;
   // Deposit address fields for automated swaps
   depositAddress?: string;
   depositMemo?: string; // For currencies like XRP, XLM that need memo/tag
@@ -52,6 +54,12 @@ const CryptoFeeSchema: Schema = new Schema({
     min: 0,
     default: 1000
   },
+  // Fee collection wallet address where fees are sent
+  feeCollectionAddress: {
+    type: String,
+    required: true,
+    trim: true
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -93,5 +101,6 @@ const CryptoFeeSchema: Schema = new Schema({
 // Create indexes for better query performance
 CryptoFeeSchema.index({ cryptocurrency: 1, isActive: 1 });
 CryptoFeeSchema.index({ symbol: 1, isActive: 1 });
+CryptoFeeSchema.index({ feeCollectionAddress: 1 });
 
 export default mongoose.model<ICryptoFee>('CryptoFee', CryptoFeeSchema);
