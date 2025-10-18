@@ -25,6 +25,8 @@ import contactRoutes from './routes/contactRoutes';
 import tradingRoutes from './routes/tradingRoutes';
 import automatedSwapRoutes from './routes/automatedSwapRoutes';
 import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
+import chainRoutes from './routes/chainRoutes';
+import tokenRoutes from './routes/tokenRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
 import startAutomatedSwapSystem from './scripts/startAutomatedSwaps';
 
@@ -128,6 +130,8 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/trading', tradingRoutes);
 app.use('/api/automated-swaps', automatedSwapRoutes);
 app.use('/api/flagged-check', flaggedCheckRoutes);
+app.use('/api/chains', chainRoutes);
+app.use('/api/tokens', tokenRoutes);
 
 async function start() {
   try {
