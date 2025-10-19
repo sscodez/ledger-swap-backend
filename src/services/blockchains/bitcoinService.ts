@@ -1,9 +1,15 @@
 /**
  * Bitcoin Blockchain Integration Service
  * Handles BTC transactions, address generation, and UTXO management
+ * Following production-ready patterns with bitcoinjs-lib
  */
 
 import axios from 'axios';
+import * as bitcoin from 'bitcoinjs-lib';
+import { ECPairFactory, ECPairInterface } from 'ecpair';
+import * as tinysecp from 'tiny-secp256k1';
+
+const ECPair = ECPairFactory(tinysecp);
 
 export interface BitcoinTransaction {
   txid: string;
@@ -33,6 +39,7 @@ export interface BitcoinAddressBalance {
 class BitcoinService {
   private rpcEndpoints: string[];
   private currentEndpointIndex = 0;
+  private network: bitcoin.Network;
 
   constructor() {
     this.rpcEndpoints = [
@@ -40,6 +47,118 @@ class BitcoinService {
       'https://blockchain.info',
       'https://btc.getblock.io/mainnet'
     ];
+    
+    // Set network (mainnet or testnet)
+    this.network = process.env.BTC_NETWORK === 'testnet' 
+      ? bitcoin.networks.testnet 
+      : bitcoin.networks.bitcoin;
+  }
+
+  /**
+   * Generate new Bitcoin address (production-ready)
+   * Creates a random keypair and returns P2WPKH (native SegWit) address
+   * IMPORTANT: Store privateKeyWIF securely (encrypted in DB or vault)
+   */
+  async generateAddress(): Promise<{ address: string; privateKeyWIF: string }> {
+    // Generate random keypair
+    const keyPair = ECPair.makeRandom({ network: this.network });
+    
+    // Generate P2WPKH (native SegWit) address - bc1q... format
+    const { address } = bitcoin.payments.p2wpkh({
+      pubkey: keyPair.publicKey,
+      network: this.network
+    });
+    
+    console.log(`✅ Generated new BTC address: ${address}`);
+    
+    return {
+      address: address!,
+      privateKeyWIF: keyPair.toWIF() // MUST be stored encrypted
+    };
+  }
+
+  /**
+   * Send Bitcoin transaction (production pattern)
+   * Builds, signs, and broadcasts BTC transaction
+   * @param privateKeyWIF - Private key in WIF format (from secure storage)
+   * @param toAddress - Recipient Bitcoin address
+   * @param amountBTC - Amount in BTC (as number)
+   * @param feeRate - Fee rate in satoshis per byte (default: 10)
+   * @returns Transaction ID
+   */
+  async sendTransaction(
+    privateKeyWIF: string,
+    toAddress: string,
+    amountBTC: number,
+    feeRate: number = 10
+  ): Promise<string> {
+    try {
+      console.log(`📤 Sending ${amountBTC} BTC to ${toAddress}...`);
+      
+      const keyPair = ECPair.fromWIF(privateKeyWIF, this.network);
+      const { address: fromAddress } = bitcoin.payments.p2wpkh({
+        pubkey: keyPair.publicKey,
+        network: this.network
+      });
+      
+      // Get UTXOs for the from address
+      const utxos = await this.getUTXOs(fromAddress!);
+      
+      if (utxos.length === 0) {
+        throw new Error('No UTXOs available for spending');
+      }
+      
+      // Build transaction with PSBT
+      const psbt = new bitcoin.Psbt({ network: this.network });
+      
+      let inputSum = 0;
+      for (const utxo of utxos) {
+        // Get full transaction for each UTXO
+        const txHex = await this.getRawTransaction(utxo.txid);
+        
+        psbt.addInput({
+          hash: utxo.txid,
+          index: utxo.vout,
+          nonWitnessUtxo: Buffer.from(txHex, 'hex')
+        });
+        
+        inputSum += utxo.value;
+      }
+      
+      const satoshiAmount = Math.floor(amountBTC * 100000000);
+      const estimatedFee = feeRate * 250; // Rough estimate for 1-input, 2-output tx
+      const change = inputSum - satoshiAmount - estimatedFee;
+      
+      // Add output to recipient
+      psbt.addOutput({
+        address: toAddress,
+        value: satoshiAmount
+      });
+      
+      // Add change output if significant
+      if (change > 1000) {
+        psbt.addOutput({
+          address: fromAddress!,
+          value: change
+        });
+      }
+      
+      // Sign all inputs
+      psbt.signAllInputs(keyPair);
+      psbt.finalizeAllInputs();
+      
+      // Extract and broadcast
+      const tx = psbt.extractTransaction();
+      const txHex = tx.toHex();
+      const txid = await this.broadcastTransaction(txHex);
+      
+      console.log(`✅ BTC transaction sent! TXID: ${txid}`);
+      
+      return txid;
+    } catch (error: any) {
+      console.error('❌ Bitcoin send transaction error:', error);
+      throw new Error(`Failed to send BTC: ${error.message}`);
+    }
   }
 
   /**

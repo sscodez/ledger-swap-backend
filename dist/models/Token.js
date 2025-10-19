@@ -39,7 +39,30 @@ const tokenSchema = new mongoose_1.Schema({
     symbol: { type: String, required: true, index: true },
     name: { type: String, required: true },
     chainKey: { type: String, required: true, index: true },
+    tokenType: {
+        type: String,
+        enum: ['native', 'erc20', 'bep20', 'trc20', 'xrc20', 'stellar-asset', 'xrp-trustline', 'iota-token'],
+        required: true
+    },
+    contractAddress: { type: String, index: true },
+    issuerAddress: { type: String },
+    decimals: { type: Number, required: true, default: 18 },
+    iconUrl: { type: String },
+    coingeckoId: { type: String, index: true },
+    minSwapAmount: { type: String, default: '0' },
+    maxSwapAmount: { type: String, default: '1000000000' },
     enabled: { type: Boolean, default: true, index: true },
+    isStablecoin: { type: Boolean, default: false },
+    liquidityScore: { type: Number, default: 50, min: 0, max: 100 },
+    metadata: {
+        website: { type: String },
+        description: { type: String },
+        marketCap: { type: String }
+    }
 }, { timestamps: true });
+// Compound indexes for efficient queries
+tokenSchema.index({ chainKey: 1, enabled: 1 });
+tokenSchema.index({ symbol: 1, chainKey: 1 });
+tokenSchema.index({ enabled: 1, liquidityScore: -1 });
 const Token = mongoose_1.default.model('Token', tokenSchema);
 exports.default = Token;

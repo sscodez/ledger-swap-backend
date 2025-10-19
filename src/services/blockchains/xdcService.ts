@@ -1,9 +1,10 @@
 /**
- * XDC Network (XinFin) Integration Service
- * Handles XDC transactions and XRC20 tokens
- * XDC is EVM-compatible with some differences in address format
+ * XDC Network Service
+ * Handles XDC (XinFin) blockchain operations
+ * Following production-ready patterns for wallet generation, monitoring, and transactions
  */
 
+import { ethers } from 'ethers';
 import Web3 from 'web3';
 import axios from 'axios';
 
@@ -32,6 +33,7 @@ class XDCService {
   private rpcEndpoints: string[];
   private currentEndpointIndex = 0;
   private explorerUrl: string;
+  private provider: ethers.providers.JsonRpcProvider;
 
   constructor() {
     this.rpcEndpoints = [
@@ -42,6 +44,7 @@ class XDCService {
     
     this.explorerUrl = 'https://explorer.xinfin.network';
     this.web3 = new Web3(this.getRpcEndpoint());
+    this.provider = new ethers.providers.JsonRpcProvider(this.getRpcEndpoint());
   }
 
   /**
@@ -57,6 +60,7 @@ class XDCService {
   private switchToNextEndpoint(): void {
     this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
     this.web3 = new Web3(this.getRpcEndpoint());
+    this.provider = new ethers.providers.JsonRpcProvider(this.getRpcEndpoint());
     console.log(`🔄 Switched to XDC RPC endpoint: ${this.getRpcEndpoint()}`);
   }
 
@@ -81,6 +85,26 @@ class XDCService {
   }
 
   /**
+   * Generate new XDC address (production-ready)
+   * Creates a random wallet and returns XDC-formatted address
+   * IMPORTANT: Store privateKey securely (encrypted in DB or vault)
+   */
+  async generateAddress(): Promise<{ address: string; privateKey: string }> {
+    // Generate a new random wallet using ethers.js
+    const wallet = ethers.Wallet.createRandom();
+    
+    // Convert Ethereum-style address to XDC format (xdc prefix instead of 0x)
+    const xdcAddress = this.ethToXdc(wallet.address);
+    
+    console.log(`✅ Generated new XDC address: ${xdcAddress}`);
+    
+    return {
+      address: xdcAddress,
+      privateKey: wallet.privateKey // MUST be stored encrypted
+    };
+  }
+
+  /**
    * Get XDC balance
    */
   async getBalance(address: string): Promise<string> {
@@ -96,40 +120,61 @@ class XDCService {
   }
 
   /**
-   * Get XRC20 token balance
+   * Monitor address for deposits (production pattern)
+   * Polls blockchain for new transactions to the deposit address
+   * @param address - XDC address to monitor
+   * @param callback - Function called when deposit detected
+   * @param interval - Polling interval in milliseconds (default 15s)
    */
-  async getTokenBalance(tokenAddress: string, holderAddress: string): Promise<string> {
-    try {
-      const tokenEthAddress = this.xdcToEth(tokenAddress);
-      const holderEthAddress = this.xdcToEth(holderAddress);
-
-      // ERC20 balanceOf function ABI
-      const minABI = [
-        {
-          constant: true,
-          inputs: [{ name: '_owner', type: 'address' }],
-          name: 'balanceOf',
-          outputs: [{ name: 'balance', type: 'uint256' }],
-          type: 'function'
-        },
-        {
-          constant: true,
-          inputs: [],
-          name: 'decimals',
-          outputs: [{ name: '', type: 'uint8' }],
-          type: 'function'
+  async monitorAddress(
+    address: string,
+    callback: (tx: XDCTransaction) => void,
+    interval: number = 15000
+  ): Promise<NodeJS.Timeout> {
+    const ethAddress = this.xdcToEth(address);
+    let lastBlock = await this.web3.eth.getBlockNumber();
+    
+    console.log(`🔍 Started monitoring XDC address: ${address} from block ${lastBlock}`);
+    
+    const intervalId = setInterval(async () => {
+      try {
+        const currentBlock = await this.web3.eth.getBlockNumber();
+        
+        // Check for new blocks
+        if (currentBlock > lastBlock) {
+          console.log(`📦 Checking XDC blocks ${lastBlock + 1} to ${currentBlock}`);
+          
+          // Scan each new block for transactions
+          for (let i = lastBlock + 1; i <= currentBlock; i++) {
+            const block = await this.web3.eth.getBlock(i, true);
+            
+            if (block && block.transactions) {
+              for (const tx of block.transactions as any[]) {
+                // Check if transaction is TO our address AND has value
+                if (tx.to && 
+                    tx.to.toLowerCase() === ethAddress.toLowerCase() && 
+                    tx.value && 
+                    tx.value.toString() !== '0') {
+                  
+                  console.log(`💰 XDC deposit detected! TX: ${tx.hash}`);
+                  
+                  const transaction = await this.getTransaction(tx.hash);
+                  if (transaction) {
+                    callback(transaction);
+                  }
+                }
+              }
+            }
+          }
+          
+          lastBlock = currentBlock;
         }
-      ];
-
-      const contract = new this.web3.eth.Contract(minABI as any, tokenEthAddress);
-      const balance = await contract.methods.balanceOf(holderEthAddress).call();
-      const decimals = await contract.methods.decimals().call();
-
-      return this.web3.utils.fromWei(balance.toString(), 'ether');
-    } catch (error: any) {
-      console.error(`❌ XDC getTokenBalance error:`, error.message);
-      return '0';
-    }
+      } catch (error) {
+        console.error('❌ Error monitoring XDC address:', error);
+      }
+    }, interval);
+    
+    return intervalId;
   }
 
   /**
@@ -164,159 +209,39 @@ class XDCService {
   }
 
   /**
-   * Monitor address for new transactions
+   * Send XDC transaction (production pattern)
+   * Signs and broadcasts transaction to send XDC to recipient
+   * @param privateKey - Sender's private key (from secure storage)
+   * @param toAddress - Recipient XDC address
+   * @param amount - Amount in XDC (as string)
+   * @returns Transaction hash
    */
-  async monitorAddress(
-    address: string,
-    callback: (tx: XDCTransaction) => void,
-    interval: number = 15000 // XDC block time ~2 seconds, check every 15s
-  ): Promise<NodeJS.Timeout> {
-    console.log(`👁️ Monitoring XDC address: ${address}`);
+  async sendTransaction(
+    privateKey: string,
+    toAddress: string,
+    amount: string
+  ): Promise<string> {
+    // Create wallet from private key
+    const wallet = new ethers.Wallet(privateKey, this.provider);
+    const ethToAddress = this.xdcToEth(toAddress);
     
-    const ethAddress = this.xdcToEth(address);
-    let lastBlock = await this.web3.eth.getBlockNumber();
+    console.log(`📤 Sending ${amount} XDC to ${toAddress}...`);
     
-    const intervalId = setInterval(async () => {
-      try {
-        const currentBlock = await this.web3.eth.getBlockNumber();
-        
-        if (currentBlock > lastBlock) {
-          // Check blocks for transactions to this address
-          for (let i = lastBlock + 1; i <= currentBlock; i++) {
-            const block = await this.web3.eth.getBlock(i, true);
-            
-            if (block && block.transactions) {
-              for (const tx of block.transactions as any[]) {
-                if (tx.to && tx.to.toLowerCase() === ethAddress.toLowerCase() && tx.value && tx.value.toString() !== '0') {
-                  console.log(`💰 New XDC transaction detected: ${tx.hash}`);
-                  
-                  const transaction = await this.getTransaction(tx.hash);
-                  if (transaction) {
-                    callback(transaction);
-                  }
-                }
-              }
-            }
-          }
-          
-          lastBlock = currentBlock;
-        }
-      } catch (error: any) {
-        console.error(`❌ XDC monitoring error:`, error.message);
-      }
-    }, interval);
+    // Send transaction
+    const tx = await wallet.sendTransaction({
+      to: ethToAddress,
+      value: ethers.utils.parseEther(amount)
+    });
     
-    return intervalId;
-  }
-
-  /**
-   * Monitor XRC20 token transfers
-   */
-  async monitorTokenTransfers(
-    tokenAddress: string,
-    recipientAddress: string,
-    callback: (transfer: any) => void,
-    interval: number = 15000
-  ): Promise<NodeJS.Timeout> {
-    console.log(`👁️ Monitoring XRC20 token ${tokenAddress} for ${recipientAddress}`);
+    console.log(`✅ XDC transaction sent! Hash: ${tx.hash}`);
+    console.log(`⏳ Waiting for confirmation...`);
     
-    const tokenEthAddress = this.xdcToEth(tokenAddress);
-    const recipientEthAddress = this.xdcToEth(recipientAddress);
+    // Wait for transaction to be mined
+    await tx.wait();
     
-    // Transfer event signature
-    const transferEventSignature = this.web3.utils.sha3('Transfer(address,address,uint256)');
+    console.log(`✅ XDC transaction confirmed in block`);
     
-    let lastBlock = await this.web3.eth.getBlockNumber();
-    
-    const intervalId = setInterval(async () => {
-      try {
-        const currentBlock = await this.web3.eth.getBlockNumber();
-        
-        if (currentBlock > lastBlock) {
-          const logs = await this.web3.eth.getPastLogs({
-            fromBlock: lastBlock + 1,
-            toBlock: currentBlock,
-            address: tokenEthAddress,
-            topics: [
-              transferEventSignature,
-              null,
-              this.web3.utils.padLeft(recipientEthAddress, 64)
-            ]
-          });
-          
-          for (const log of logs) {
-            console.log(`💰 New XRC20 transfer detected`);
-            callback(log);
-          }
-          
-          lastBlock = currentBlock;
-        }
-      } catch (error: any) {
-        console.error(`❌ XDC token monitoring error:`, error.message);
-      }
-    }, interval);
-    
-    return intervalId;
-  }
-
-  /**
-   * Get XRC20 token info
-   */
-  async getTokenInfo(tokenAddress: string): Promise<XRC20Token | null> {
-    try {
-      const tokenEthAddress = this.xdcToEth(tokenAddress);
-
-      const minABI = [
-        {
-          constant: true,
-          inputs: [],
-          name: 'name',
-          outputs: [{ name: '', type: 'string' }],
-          type: 'function'
-        },
-        {
-          constant: true,
-          inputs: [],
-          name: 'symbol',
-          outputs: [{ name: '', type: 'string' }],
-          type: 'function'
-        },
-        {
-          constant: true,
-          inputs: [],
-          name: 'decimals',
-          outputs: [{ name: '', type: 'uint8' }],
-          type: 'function'
-        },
-        {
-          constant: true,
-          inputs: [],
-          name: 'totalSupply',
-          outputs: [{ name: '', type: 'uint256' }],
-          type: 'function'
-        }
-      ];
-
-      const contract = new this.web3.eth.Contract(minABI as any, tokenEthAddress);
-
-      const [name, symbol, decimals, totalSupply] = await Promise.all([
-        contract.methods.name().call(),
-        contract.methods.symbol().call(),
-        contract.methods.decimals().call(),
-        contract.methods.totalSupply().call()
-      ]);
-
-      return {
-        address: this.ethToXdc(tokenEthAddress),
-        name: name as string,
-        symbol: symbol as string,
-        decimals: Number(decimals),
-        totalSupply: totalSupply.toString()
-      };
-    } catch (error: any) {
-      console.error(`❌ XDC getTokenInfo error:`, error.message);
-      return null;
-    }
+    return tx.hash;
   }
 
   /**
@@ -328,28 +253,6 @@ class XDCService {
     const ethPattern = /^0x[a-fA-F0-9]{40}$/;
     
     return xdcPattern.test(address) || ethPattern.test(address);
-  }
-
-  /**
-   * Estimate gas for transaction
-   */
-  async estimateGas(from: string, to: string, value: string): Promise<string> {
-    try {
-      const ethFrom = this.xdcToEth(from);
-      const ethTo = this.xdcToEth(to);
-      const valueWei = this.web3.utils.toWei(value, 'ether');
-
-      const gasEstimate = await this.web3.eth.estimateGas({
-        from: ethFrom,
-        to: ethTo,
-        value: valueWei
-      });
-
-      return gasEstimate.toString();
-    } catch (error: any) {
-      console.error(`❌ XDC estimateGas error:`, error.message);
-      return '21000'; // Default gas limit for simple transfer
-    }
   }
 
   /**

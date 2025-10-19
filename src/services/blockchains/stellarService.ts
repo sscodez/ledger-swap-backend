@@ -1,9 +1,11 @@
 /**
  * Stellar (XLM) Blockchain Integration Service
  * Handles Stellar transactions, assets, and trustlines
+ * Following production-ready patterns with stellar-sdk
  */
 
 import axios from 'axios';
+import { Keypair, Server, Asset, TransactionBuilder, Operation, Networks, Memo } from 'stellar-sdk';
 
 export interface StellarTransaction {
   hash: string;
@@ -40,27 +42,111 @@ export interface StellarAccount {
 }
 
 class StellarService {
-  private horizonUrl: string;
+  private server: Server;
   private networkPassphrase: string;
 
   constructor() {
-    this.horizonUrl = process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org';
-    this.networkPassphrase = 'Public Global Stellar Network ; September 2015';
+    const horizonUrl = process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org';
+    this.server = new Server(horizonUrl);
+    this.networkPassphrase = Networks.PUBLIC; // or Networks.TESTNET
   }
 
   /**
-   * Get Stellar account info
+   * Generate new Stellar keypair (production-ready)
+   * Creates a new random keypair and returns public key and secret
+   * IMPORTANT: Store secret securely (encrypted in DB or vault)
+   */
+  async generateAddress(): Promise<{ address: string; secret: string }> {
+    // Generate new keypair with stellar-sdk
+    const keypair = Keypair.random();
+    
+    console.log(`✅ Generated new XLM address: ${keypair.publicKey()}`);
+    
+    // Note: New accounts need funding (min 1 XLM) before they're active on mainnet
+    // On testnet: await fetch(`https://friendbot.stellar.org?addr=${keypair.publicKey()}`);
+    
+    return {
+      address: keypair.publicKey(),
+      secret: keypair.secret() // MUST be stored encrypted
+    };
+  }
+
+  /**
+   * Send XLM payment (production pattern)
+   * Signs and submits payment transaction to Stellar network
+   * @param senderSecret - Secret key (from secure storage)
+   * @param toAddress - Recipient Stellar address
+   * @param amount - Amount in XLM (as string)
+   * @param asset - Asset to send (default: native XLM)
+   * @param memo - Optional memo text
+   * @returns Transaction hash
+   */
+  async sendTransaction(
+    senderSecret: string,
+    toAddress: string,
+    amount: string,
+    asset: Asset = Asset.native(),
+    memo?: string
+  ): Promise<string> {
+    try {
+      const sourceKeypair = Keypair.fromSecret(senderSecret);
+      
+      console.log(`📤 Sending ${amount} XLM to ${toAddress}...`);
+      
+      // Load source account
+      const account = await this.server.loadAccount(sourceKeypair.publicKey());
+      
+      // Get base fee from network
+      const fee = await this.server.fetchBaseFee();
+      
+      // Build transaction
+      let txBuilder = new TransactionBuilder(account, {
+        fee: fee.toString(),
+        networkPassphrase: this.networkPassphrase
+      })
+        .addOperation(
+          Operation.payment({
+            destination: toAddress,
+            asset: asset,
+            amount: amount
+          })
+        )
+        .setTimeout(30);
+      
+      // Add memo if provided
+      if (memo) {
+        txBuilder = txBuilder.addMemo(Memo.text(memo));
+      }
+      
+      const transaction = txBuilder.build();
+      
+      // Sign transaction
+      transaction.sign(sourceKeypair);
+      
+      // Submit to network
+      const result = await this.server.submitTransaction(transaction);
+      
+      console.log(`✅ XLM payment successful! Hash: ${result.hash}`);
+      
+      return result.hash;
+    } catch (error: any) {
+      console.error('❌ Stellar send transaction error:', error);
+      throw new Error(`Failed to send XLM: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get Stellar account info (using stellar-sdk Server)
    */
   async getAccount(address: string): Promise<StellarAccount | null> {
     try {
-      const response = await axios.get(`${this.horizonUrl}/accounts/${address}`);
-      const account = response.data;
+      const account = await this.server.loadAccount(address);
 
       return {
-        address: account.id,
+        address: account.accountId(),
         sequence: account.sequence,
         balances: account.balances,
-        subentryCount: account.subentry_count
+        subentryCount: account.subentries
       };
     } catch (error: any) {
       if (error.response?.status === 404) {

@@ -1,9 +1,11 @@
 /**
  * XRP Ledger Integration Service
  * Handles XRP transactions, trustlines, and account management
+ * Following production-ready patterns with xrpl.js SDK
  */
 
 import axios from 'axios';
+import { Client, Wallet, xrpToDrops, dropsToXrp } from 'xrpl';
 
 export interface XRPTransaction {
   hash: string;
@@ -39,6 +41,7 @@ export interface XRPTrustline {
 class XRPService {
   private rpcEndpoints: string[];
   private currentEndpointIndex = 0;
+  private wsEndpoint: string;
 
   constructor() {
     this.rpcEndpoints = [
@@ -46,6 +49,82 @@ class XRPService {
       'https://s2.ripple.com:51234',
       'https://xrplcluster.com'
     ];
+    this.wsEndpoint = process.env.XRP_WS_URL || 'wss://xrplcluster.com';
+  }
+
+  /**
+   * Generate new XRP wallet (production-ready)
+   * Creates a new keypair and returns address and seed
+   * IMPORTANT: Store seed securely (encrypted in DB or vault)
+   */
+  async generateAddress(): Promise<{ address: string; seed: string }> {
+    // Generate new wallet with xrpl.js
+    const wallet = Wallet.generate();
+    
+    console.log(`✅ Generated new XRP address: ${wallet.classicAddress}`);
+    
+    return {
+      address: wallet.classicAddress,
+      seed: wallet.seed // MUST be stored encrypted
+    };
+  }
+
+  /**
+   * Send XRP payment (production pattern)
+   * Signs and submits payment transaction
+   * @param senderSeed - Wallet seed (from secure storage)
+   * @param toAddress - Recipient XRP address
+   * @param amount - Amount in XRP (as string)
+   * @param destinationTag - Optional destination tag
+   * @returns Transaction hash
+   */
+  async sendTransaction(
+    senderSeed: string,
+    toAddress: string,
+    amount: string,
+    destinationTag?: number
+  ): Promise<string> {
+    const client = new Client(this.wsEndpoint);
+    
+    try {
+      await client.connect();
+      console.log(`📤 Sending ${amount} XRP to ${toAddress}...`);
+      
+      // Create wallet from seed
+      const wallet = Wallet.fromSeed(senderSeed);
+      
+      // Prepare payment transaction
+      const payment: any = {
+        TransactionType: 'Payment',
+        Account: wallet.address,
+        Destination: toAddress,
+        Amount: xrpToDrops(amount)
+      };
+      
+      // Add destination tag if provided
+      if (destinationTag !== undefined) {
+        payment.DestinationTag = destinationTag;
+      }
+      
+      // Autofill (adds fee, sequence, etc.)
+      const prepared = await client.autofill(payment);
+      
+      // Sign transaction
+      const signed = wallet.sign(prepared);
+      
+      // Submit and wait for validation
+      const result = await client.submitAndWait(signed.tx_blob);
+      
+      console.log(`✅ XRP payment successful! Hash: ${result.result.hash}`);
+      
+      await client.disconnect();
+      
+      return result.result.hash;
+    } catch (error: any) {
+      console.error('❌ XRP send transaction error:', error);
+      await client.disconnect();
+      throw new Error(`Failed to send XRP: ${error.message}`);
+    }
   }
 
   /**

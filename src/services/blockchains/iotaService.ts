@@ -2,9 +2,11 @@
  * IOTA (Shimmer/IOTA 2.0) Integration Service
  * Handles IOTA transactions and native tokens on the Tangle
  * Note: IOTA uses a DAG (Directed Acyclic Graph) instead of blockchain
+ * Following production-ready patterns with @iota/sdk
  */
 
 import axios from 'axios';
+import { Client, SecretManager } from '@iota/sdk';
 
 export interface IOTATransaction {
   messageId: string;
@@ -40,19 +42,90 @@ export interface IOTANativeToken {
 }
 
 class IOTAService {
-  private nodeEndpoints: string[];
-  private currentEndpointIndex = 0;
+  private client: Client;
+  private secretManager: SecretManager;
+  private accountAlias: string;
   private explorerUrl: string;
 
   constructor() {
-    // IOTA 2.0 / Shimmer network endpoints
-    this.nodeEndpoints = [
-      process.env.IOTA_NODE_URL || 'https://api.shimmer.network',
-      'https://chrysalis-nodes.iota.org',
-      'https://api.testnet.shimmer.network'
-    ];
+    // Initialize IOTA client
+    this.client = new Client({
+      nodes: [process.env.IOTA_NODE_URL || 'https://api.shimmer.network']
+    });
     
+    // Secret manager with mnemonic from env
+    this.secretManager = {
+      mnemonic: process.env.IOTA_MNEMONIC || ''
+    };
+    
+    this.accountAlias = process.env.IOTA_ACCOUNT_ALIAS || 'ledgerswap-main';
     this.explorerUrl = 'https://explorer.shimmer.network';
+  }
+
+  /**
+   * Generate new IOTA address (production-ready)
+   * Creates a new address from the account
+   * IMPORTANT: Uses mnemonic from env for account management
+   */
+  async generateAddress(): Promise<{ address: string; accountAlias: string }> {
+    // Get or create account
+    const account = await this.client.getAccount({
+      alias: this.accountAlias,
+      secretManager: this.secretManager,
+      onlyGetIfExists: false
+    });
+    
+    // Generate new Ed25519 address
+    const addressObj = await account.generateEd25519Address();
+    
+    console.log(`✅ Generated new IOTA address: ${addressObj.address}`);
+    
+    return {
+      address: addressObj.address,
+      accountAlias: this.accountAlias
+    };
+  }
+
+  /**
+   * Send IOTA transaction (production pattern)
+   * Signs and submits transaction to the Tangle
+   * @param toAddress - Recipient IOTA address
+   * @param amount - Amount in IOTA (as string, handles BigInt)
+   * @returns Block ID (IOTA uses blocks instead of transactions)
+   */
+  async sendTransaction(
+    toAddress: string,
+    amount: string
+  ): Promise<string> {
+    try {
+      console.log(`📤 Sending ${amount} IOTA to ${toAddress}...`);
+      
+      const account = await this.client.getAccount({
+        alias: this.accountAlias,
+        secretManager: this.secretManager
+      });
+      
+      // Prepare outputs
+      const outputs = [
+        {
+          address: toAddress,
+          amount: amount
+        }
+      ];
+      
+      // Send with params (allowMicroAmount: false prevents dust attacks)
+      const transaction = await account.sendWithParams(
+        outputs,
+        { allowMicroAmount: false }
+      );
+      
+      console.log(`✅ IOTA transaction sent! Block ID: ${transaction.blockId}`);
+      
+      return transaction.blockId;
+    } catch (error: any) {
+      console.error('❌ IOTA send transaction error:', error);
+      throw new Error(`Failed to send IOTA: ${error.message}`);
+    }
   }
 
   /**
