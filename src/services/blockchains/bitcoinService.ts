@@ -225,6 +225,28 @@ class BitcoinService {
   }
 
   /**
+   * Get UTXOs formatted for PSBT consumption (values in satoshis)
+   */
+  private async getUTXOs(address: string): Promise<Array<{ txid: string; vout: number; value: number }>> {
+    const utxos = await this.getAddressUTXOs(address);
+    // Convert BTC values to satoshis
+    return utxos.map((u) => ({
+      txid: u.txid,
+      vout: u.vout,
+      value: Math.floor(u.value * 1e8),
+    }));
+  }
+
+  /**
+   * Get raw transaction hex for an existing transaction (for nonWitnessUtxo)
+   */
+  private async getRawTransaction(txid: string): Promise<string> {
+    const endpoint = this.getRpcEndpoint();
+    const { data } = await axios.get(`${endpoint}/tx/${txid}/hex`);
+    return data; // hex string
+  }
+
+  /**
    * Get transaction details
    */
   async getTransaction(txid: string): Promise<BitcoinTransaction | null> {

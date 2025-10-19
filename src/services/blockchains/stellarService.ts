@@ -5,7 +5,16 @@
  */
 
 import axios from 'axios';
-import { Keypair, Server, Asset, TransactionBuilder, Operation, Networks, Memo } from 'stellar-sdk';
+const StellarSdk = require('stellar-sdk');
+const Keypair = StellarSdk.Keypair;
+const Server = StellarSdk.Server;
+const Asset = StellarSdk.Asset;
+const TransactionBuilder = StellarSdk.TransactionBuilder;
+const Operation = StellarSdk.Operation;
+const Networks = StellarSdk.Networks;
+const Memo = StellarSdk.Memo;
+
+type StellarServer = typeof Server;
 
 export interface StellarTransaction {
   hash: string;
@@ -42,12 +51,13 @@ export interface StellarAccount {
 }
 
 class StellarService {
-  private server: Server;
+  private server: any; // Stellar Server instance
   private networkPassphrase: string;
+  private horizonUrl: string;
 
   constructor() {
-    const horizonUrl = process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org';
-    this.server = new Server(horizonUrl);
+    this.horizonUrl = process.env.STELLAR_HORIZON_URL || 'https://horizon.stellar.org';
+    this.server = new Server(this.horizonUrl);
     this.networkPassphrase = Networks.PUBLIC; // or Networks.TESTNET
   }
 
@@ -85,9 +95,10 @@ class StellarService {
     senderSecret: string,
     toAddress: string,
     amount: string,
-    asset: Asset = Asset.native(),
+    asset: any = null, // Stellar Asset
     memo?: string
   ): Promise<string> {
+    const assetToUse = asset || Asset.native();
     try {
       const sourceKeypair = Keypair.fromSecret(senderSecret);
       
@@ -107,7 +118,7 @@ class StellarService {
         .addOperation(
           Operation.payment({
             destination: toAddress,
-            asset: asset,
+            asset: assetToUse,
             amount: amount
           })
         )
@@ -190,15 +201,11 @@ class StellarService {
    */
   async getTransaction(hash: string): Promise<StellarTransaction | null> {
     try {
-      const response = await axios.get(`${this.horizonUrl}/transactions/${hash}`);
-      const tx = response.data;
-
-      // Get operations to extract payment details
-      const opsResponse = await axios.get(tx._links.operations.href);
-      const operations = opsResponse.data._embedded.records;
+      const tx = await this.server.transactions().transaction(hash).call();
+      const operations = await this.server.operations().forTransaction(hash).call();
 
       // Find payment operation
-      const paymentOp = operations.find((op: any) => op.type === 'payment' || op.type === 'path_payment_strict_send');
+      const paymentOp = operations.records.find((op: any) => op.type === 'payment' || op.type === 'path_payment_strict_send');
 
       if (!paymentOp) {
         return null;
@@ -206,16 +213,16 @@ class StellarService {
 
       return {
         hash: tx.hash,
-        from: paymentOp.from || tx.source_account,
-        to: paymentOp.to || '',
-        amount: paymentOp.amount || '0',
+        from: paymentOp?.from || (tx as any).source_account,
+        to: paymentOp?.to || '',
+        amount: paymentOp?.amount || '0',
         asset: {
-          code: paymentOp.asset_type === 'native' ? 'XLM' : paymentOp.asset_code,
-          issuer: paymentOp.asset_issuer
+          code: paymentOp?.asset_type === 'native' ? 'XLM' : paymentOp?.asset_code || 'XLM',
+          issuer: paymentOp?.asset_issuer
         },
-        memo: tx.memo,
-        ledger: tx.ledger,
-        timestamp: tx.created_at
+        memo: (tx as any).memo || '',
+        ledger: (tx as any).ledger,
+        timestamp: (tx as any).created_at
       };
     } catch (error: any) {
       console.error(`❌ Stellar getTransaction error:`, error.message);
@@ -235,44 +242,41 @@ class StellarService {
     console.log(`👁️ Monitoring Stellar address: ${address}`);
 
     try {
-      // Use Stellar's streaming API
-      const url = `${this.horizonUrl}/accounts/${address}/payments`;
-      const params = new URLSearchParams({ cursor: 'now', order: 'asc' });
+      // Use Stellar SDK's streaming API
+      this.server.payments()
+        .forAccount(address)
+        .cursor('now')
+        .stream({
+          onmessage: async (payment: any) => {
+            try {
+              // Filter by asset if specified
+              if (assetCode && payment.asset_code !== assetCode) {
+                return;
+              }
+              if (assetIssuer && payment.asset_issuer !== assetIssuer) {
+                return;
+              }
 
-      const eventSource = new EventSource(`${url}?${params}`);
+              // Only process incoming payments
+              if (payment.to !== address) {
+                return;
+              }
 
-      eventSource.onmessage = async (event: any) => {
-        try {
-          const payment = JSON.parse(event.data);
+              console.log(`💰 New Stellar payment detected: ${payment.transaction_hash}`);
 
-          // Filter by asset if specified
-          if (assetCode && payment.asset_code !== assetCode) {
-            return;
+              const transaction = await this.getTransaction(payment.transaction_hash);
+              if (transaction) {
+                callback(transaction);
+              }
+            } catch (error: any) {
+              console.error(`❌ Stellar payment processing error:`, error.message);
+            }
+          },
+          onerror: (error: any) => {
+            console.error(`❌ Stellar stream error:`, error);
           }
-          if (assetIssuer && payment.asset_issuer !== assetIssuer) {
-            return;
-          }
+        });
 
-          // Only process incoming payments
-          if (payment.to !== address) {
-            return;
-          }
-
-          console.log(`💰 New Stellar payment detected: ${payment.transaction_hash}`);
-
-          const transaction = await this.getTransaction(payment.transaction_hash);
-          if (transaction) {
-            callback(transaction);
-          }
-        } catch (error: any) {
-          console.error(`❌ Stellar payment processing error:`, error.message);
-        }
-      };
-
-      eventSource.onerror = (error: any) => {
-        console.error(`❌ Stellar EventSource error:`, error);
-        eventSource.close();
-      };
 
     } catch (error: any) {
       console.error(`❌ Stellar monitoring error:`, error.message);
@@ -349,15 +353,12 @@ class StellarService {
   }
 
   /**
-   * Get base fee (stroops)
+   * Get base fee (stroops) - using server method
    */
   async getBaseFee(): Promise<string> {
     try {
-      const response = await axios.get(`${this.horizonUrl}/fee_stats`);
-      const feeStats = response.data;
-
-      // Return median fee in stroops
-      return feeStats.fee_charged.mode || '100';
+      const fee = await this.server.fetchBaseFee();
+      return fee.toString();
     } catch (error: any) {
       console.error(`❌ Stellar getBaseFee error:`, error.message);
       return '100'; // Default base fee (100 stroops = 0.00001 XLM)

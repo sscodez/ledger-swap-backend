@@ -65,7 +65,7 @@ class XRPService {
     
     return {
       address: wallet.classicAddress,
-      seed: wallet.seed // MUST be stored encrypted
+      seed: wallet.seed! // MUST be stored encrypted
     };
   }
 

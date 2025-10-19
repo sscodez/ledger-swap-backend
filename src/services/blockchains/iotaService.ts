@@ -6,7 +6,7 @@
  */
 
 import axios from 'axios';
-import { Client, SecretManager } from '@iota/sdk';
+import { Client } from '@iota/sdk';
 
 export interface IOTATransaction {
   messageId: string;
@@ -43,9 +43,12 @@ export interface IOTANativeToken {
 
 class IOTAService {
   private client: Client;
-  private secretManager: SecretManager;
+  private secretManager: any; // use any to avoid SecretManager type mismatch for mnemonic
   private accountAlias: string;
   private explorerUrl: string;
+  // Properties used by legacy apiRequest() helpers
+  private nodeEndpoints: string[];
+  private currentEndpointIndex: number = 0;
 
   constructor() {
     // Initialize IOTA client
@@ -53,13 +56,19 @@ class IOTAService {
       nodes: [process.env.IOTA_NODE_URL || 'https://api.shimmer.network']
     });
     
-    // Secret manager with mnemonic from env
+    // Secret manager with mnemonic from env (wallet features may require @iota/wallet)
     this.secretManager = {
       mnemonic: process.env.IOTA_MNEMONIC || ''
-    };
+    } as any;
     
     this.accountAlias = process.env.IOTA_ACCOUNT_ALIAS || 'ledgerswap-main';
     this.explorerUrl = 'https://explorer.shimmer.network';
+
+    // Legacy HTTP endpoints (used by apiRequest helpers)
+    this.nodeEndpoints = [
+      process.env.IOTA_NODE_URL || 'https://api.shimmer.network',
+      'https://api.testnet.shimmer.network'
+    ];
   }
 
   /**
@@ -69,7 +78,7 @@ class IOTAService {
    */
   async generateAddress(): Promise<{ address: string; accountAlias: string }> {
     // Get or create account
-    const account = await this.client.getAccount({
+    const account = await (this.client as any).getAccount({
       alias: this.accountAlias,
       secretManager: this.secretManager,
       onlyGetIfExists: false
@@ -100,7 +109,7 @@ class IOTAService {
     try {
       console.log(`📤 Sending ${amount} IOTA to ${toAddress}...`);
       
-      const account = await this.client.getAccount({
+      const account = await (this.client as any).getAccount({
         alias: this.accountAlias,
         secretManager: this.secretManager
       });
