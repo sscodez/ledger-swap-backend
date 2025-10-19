@@ -3,6 +3,7 @@
  * IOTA (Shimmer/IOTA 2.0) Integration Service
  * Handles IOTA transactions and native tokens on the Tangle
  * Note: IOTA uses a DAG (Directed Acyclic Graph) instead of blockchain
+ * Following production-ready patterns with @iota/sdk
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -19,16 +20,80 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.iotaService = void 0;
 const axios_1 = __importDefault(require("axios"));
+const sdk_1 = require("@iota/sdk");
 class IOTAService {
     constructor() {
         this.currentEndpointIndex = 0;
-        // IOTA 2.0 / Shimmer network endpoints
+        // Initialize IOTA client
+        this.client = new sdk_1.Client({
+            nodes: [process.env.IOTA_NODE_URL || 'https://api.shimmer.network']
+        });
+        // Secret manager with mnemonic from env (wallet features may require @iota/wallet)
+        this.secretManager = {
+            mnemonic: process.env.IOTA_MNEMONIC || ''
+        };
+        this.accountAlias = process.env.IOTA_ACCOUNT_ALIAS || 'ledgerswap-main';
+        this.explorerUrl = 'https://explorer.shimmer.network';
+        // Legacy HTTP endpoints (used by apiRequest helpers)
         this.nodeEndpoints = [
             process.env.IOTA_NODE_URL || 'https://api.shimmer.network',
-            'https://chrysalis-nodes.iota.org',
             'https://api.testnet.shimmer.network'
         ];
-        this.explorerUrl = 'https://explorer.shimmer.network';
+    }
+    /**
+     * Generate new IOTA address (production-ready)
+     * Creates a new address from the account
+     * IMPORTANT: Uses mnemonic from env for account management
+     */
+    generateAddress() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Get or create account
+            const account = yield this.client.getAccount({
+                alias: this.accountAlias,
+                secretManager: this.secretManager,
+                onlyGetIfExists: false
+            });
+            // Generate new Ed25519 address
+            const addressObj = yield account.generateEd25519Address();
+            console.log(`✅ Generated new IOTA address: ${addressObj.address}`);
+            return {
+                address: addressObj.address,
+                accountAlias: this.accountAlias
+            };
+        });
+    }
+    /**
+     * Send IOTA transaction (production pattern)
+     * Signs and submits transaction to the Tangle
+     * @param toAddress - Recipient IOTA address
+     * @param amount - Amount in IOTA (as string, handles BigInt)
+     * @returns Block ID (IOTA uses blocks instead of transactions)
+     */
+    sendTransaction(toAddress, amount) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                console.log(`📤 Sending ${amount} IOTA to ${toAddress}...`);
+                const account = yield this.client.getAccount({
+                    alias: this.accountAlias,
+                    secretManager: this.secretManager
+                });
+                // Prepare outputs
+                const outputs = [
+                    {
+                        address: toAddress,
+                        amount: amount
+                    }
+                ];
+                // Send with params (allowMicroAmount: false prevents dust attacks)
+                const transaction = yield account.sendWithParams(outputs, { allowMicroAmount: false });
+                console.log(`✅ IOTA transaction sent! Block ID: ${transaction.blockId}`);
+                return transaction.blockId;
+            }
+            catch (error) {
+                console.error('❌ IOTA send transaction error:', error);
+                throw new Error(`Failed to send IOTA: ${error.message}`);
+            }
+        });
     }
     /**
      * Get current node endpoint with failover

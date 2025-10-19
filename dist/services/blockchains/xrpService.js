@@ -2,6 +2,7 @@
 /**
  * XRP Ledger Integration Service
  * Handles XRP transactions, trustlines, and account management
+ * Following production-ready patterns with xrpl.js SDK
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -18,6 +19,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.xrpService = void 0;
 const axios_1 = __importDefault(require("axios"));
+const xrpl_1 = require("xrpl");
 class XRPService {
     constructor() {
         this.currentEndpointIndex = 0;
@@ -26,6 +28,68 @@ class XRPService {
             'https://s2.ripple.com:51234',
             'https://xrplcluster.com'
         ];
+        this.wsEndpoint = process.env.XRP_WS_URL || 'wss://xrplcluster.com';
+    }
+    /**
+     * Generate new XRP wallet (production-ready)
+     * Creates a new keypair and returns address and seed
+     * IMPORTANT: Store seed securely (encrypted in DB or vault)
+     */
+    generateAddress() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Generate new wallet with xrpl.js
+            const wallet = xrpl_1.Wallet.generate();
+            console.log(`✅ Generated new XRP address: ${wallet.classicAddress}`);
+            return {
+                address: wallet.classicAddress,
+                seed: wallet.seed // MUST be stored encrypted
+            };
+        });
+    }
+    /**
+     * Send XRP payment (production pattern)
+     * Signs and submits payment transaction
+     * @param senderSeed - Wallet seed (from secure storage)
+     * @param toAddress - Recipient XRP address
+     * @param amount - Amount in XRP (as string)
+     * @param destinationTag - Optional destination tag
+     * @returns Transaction hash
+     */
+    sendTransaction(senderSeed, toAddress, amount, destinationTag) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const client = new xrpl_1.Client(this.wsEndpoint);
+            try {
+                yield client.connect();
+                console.log(`📤 Sending ${amount} XRP to ${toAddress}...`);
+                // Create wallet from seed
+                const wallet = xrpl_1.Wallet.fromSeed(senderSeed);
+                // Prepare payment transaction
+                const payment = {
+                    TransactionType: 'Payment',
+                    Account: wallet.address,
+                    Destination: toAddress,
+                    Amount: (0, xrpl_1.xrpToDrops)(amount)
+                };
+                // Add destination tag if provided
+                if (destinationTag !== undefined) {
+                    payment.DestinationTag = destinationTag;
+                }
+                // Autofill (adds fee, sequence, etc.)
+                const prepared = yield client.autofill(payment);
+                // Sign transaction
+                const signed = wallet.sign(prepared);
+                // Submit and wait for validation
+                const result = yield client.submitAndWait(signed.tx_blob);
+                console.log(`✅ XRP payment successful! Hash: ${result.result.hash}`);
+                yield client.disconnect();
+                return result.result.hash;
+            }
+            catch (error) {
+                console.error('❌ XRP send transaction error:', error);
+                yield client.disconnect();
+                throw new Error(`Failed to send XRP: ${error.message}`);
+            }
+        });
     }
     /**
      * Get current RPC endpoint with failover

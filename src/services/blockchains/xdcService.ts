@@ -4,7 +4,7 @@
  * Following production-ready patterns for wallet generation, monitoring, and transactions
  */
 
-import { ethers } from 'ethers';
+import { JsonRpcProvider, Wallet, parseEther } from 'ethers';
 import Web3 from 'web3';
 import axios from 'axios';
 
@@ -33,7 +33,7 @@ class XDCService {
   private rpcEndpoints: string[];
   private currentEndpointIndex = 0;
   private explorerUrl: string;
-  private provider: ethers.providers.JsonRpcProvider;
+  private provider: JsonRpcProvider;
 
   constructor() {
     this.rpcEndpoints = [
@@ -44,7 +44,7 @@ class XDCService {
     
     this.explorerUrl = 'https://explorer.xinfin.network';
     this.web3 = new Web3(this.getRpcEndpoint());
-    this.provider = new ethers.providers.JsonRpcProvider(this.getRpcEndpoint());
+    this.provider = new JsonRpcProvider(this.getRpcEndpoint());
   }
 
   /**
@@ -60,7 +60,7 @@ class XDCService {
   private switchToNextEndpoint(): void {
     this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
     this.web3 = new Web3(this.getRpcEndpoint());
-    this.provider = new ethers.providers.JsonRpcProvider(this.getRpcEndpoint());
+    this.provider = new JsonRpcProvider(this.getRpcEndpoint());
     console.log(`🔄 Switched to XDC RPC endpoint: ${this.getRpcEndpoint()}`);
   }
 
@@ -91,7 +91,7 @@ class XDCService {
    */
   async generateAddress(): Promise<{ address: string; privateKey: string }> {
     // Generate a new random wallet using ethers.js
-    const wallet = ethers.Wallet.createRandom();
+    const wallet = Wallet.createRandom();
     
     // Convert Ethereum-style address to XDC format (xdc prefix instead of 0x)
     const xdcAddress = this.ethToXdc(wallet.address);
@@ -132,13 +132,13 @@ class XDCService {
     interval: number = 15000
   ): Promise<NodeJS.Timeout> {
     const ethAddress = this.xdcToEth(address);
-    let lastBlock = await this.web3.eth.getBlockNumber();
+    let lastBlock = Number(await this.web3.eth.getBlockNumber());
     
     console.log(`🔍 Started monitoring XDC address: ${address} from block ${lastBlock}`);
     
     const intervalId = setInterval(async () => {
       try {
-        const currentBlock = await this.web3.eth.getBlockNumber();
+        const currentBlock = Number(await this.web3.eth.getBlockNumber());
         
         // Check for new blocks
         if (currentBlock > lastBlock) {
@@ -189,7 +189,17 @@ class XDCService {
       }
 
       const receipt = await this.web3.eth.getTransactionReceipt(hash);
-      const block = await this.web3.eth.getBlock(tx.blockNumber as number);
+      const resolvedBlockNumber = tx.blockNumber != null ? Number(tx.blockNumber as any) : Number(await this.web3.eth.getBlockNumber());
+      const block = await this.web3.eth.getBlock(resolvedBlockNumber);
+      const normalizedBlockNumber = Number(tx.blockNumber ?? block.number);
+      const statusVal: any = receipt?.status;
+      const success = (() => {
+        if (typeof statusVal === 'boolean') return statusVal;
+        if (typeof statusVal === 'number') return statusVal === 1;
+        if (typeof statusVal === 'string') return statusVal === '0x1' || statusVal === '1';
+        if (typeof statusVal === 'bigint') return String(statusVal) === '1';
+        return false;
+      })();
 
       return {
         hash: tx.hash,
@@ -198,9 +208,9 @@ class XDCService {
         value: this.web3.utils.fromWei(tx.value.toString(), 'ether'),
         gas: tx.gas.toString(),
         gasPrice: this.web3.utils.fromWei(tx.gasPrice.toString(), 'gwei'),
-        blockNumber: tx.blockNumber as number,
+        blockNumber: normalizedBlockNumber,
         timestamp: Number(block.timestamp),
-        status: receipt?.status || false
+        status: success
       };
     } catch (error: any) {
       console.error(`❌ XDC getTransaction error:`, error.message);
@@ -222,7 +232,7 @@ class XDCService {
     amount: string
   ): Promise<string> {
     // Create wallet from private key
-    const wallet = new ethers.Wallet(privateKey, this.provider);
+    const wallet = new Wallet(privateKey, this.provider);
     const ethToAddress = this.xdcToEth(toAddress);
     
     console.log(`📤 Sending ${amount} XDC to ${toAddress}...`);
@@ -230,7 +240,7 @@ class XDCService {
     // Send transaction
     const tx = await wallet.sendTransaction({
       to: ethToAddress,
-      value: ethers.utils.parseEther(amount)
+      value: parseEther(amount)
     });
     
     console.log(`✅ XDC transaction sent! Hash: ${tx.hash}`);
@@ -274,8 +284,11 @@ class XDCService {
   async sendSignedTransaction(signedTx: string): Promise<string> {
     try {
       const receipt = await this.web3.eth.sendSignedTransaction(signedTx);
-      console.log(`✅ XDC transaction sent: ${receipt.transactionHash}`);
-      return receipt.transactionHash;
+      const txHash = typeof (receipt as any).transactionHash === 'string'
+        ? (receipt as any).transactionHash
+        : this.web3.utils.bytesToHex((receipt as any).transactionHash);
+      console.log(`✅ XDC transaction sent: ${txHash}`);
+      return txHash;
     } catch (error: any) {
       console.error(`❌ XDC sendSignedTransaction error:`, error.message);
       throw new Error(`Failed to send XDC transaction: ${error.message}`);
@@ -315,7 +328,7 @@ class XDCService {
     try {
       const ethAddress = this.xdcToEth(address);
       const nonce = await this.web3.eth.getTransactionCount(ethAddress);
-      return nonce;
+      return Number(nonce);
     } catch (error: any) {
       console.error(`❌ XDC getNonce error:`, error.message);
       return 0;

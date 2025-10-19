@@ -1,8 +1,8 @@
 "use strict";
 /**
- * XDC Network (XinFin) Integration Service
- * Handles XDC transactions and XRC20 tokens
- * XDC is EVM-compatible with some differences in address format
+ * XDC Network Service
+ * Handles XDC (XinFin) blockchain operations
+ * Following production-ready patterns for wallet generation, monitoring, and transactions
  */
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
@@ -18,6 +18,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.xdcService = void 0;
+const ethers_1 = require("ethers");
 const web3_1 = __importDefault(require("web3"));
 class XDCService {
     constructor() {
@@ -29,6 +30,7 @@ class XDCService {
         ];
         this.explorerUrl = 'https://explorer.xinfin.network';
         this.web3 = new web3_1.default(this.getRpcEndpoint());
+        this.provider = new ethers_1.JsonRpcProvider(this.getRpcEndpoint());
     }
     /**
      * Get current RPC endpoint with failover
@@ -42,6 +44,7 @@ class XDCService {
     switchToNextEndpoint() {
         this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.rpcEndpoints.length;
         this.web3 = new web3_1.default(this.getRpcEndpoint());
+        this.provider = new ethers_1.JsonRpcProvider(this.getRpcEndpoint());
         console.log(`🔄 Switched to XDC RPC endpoint: ${this.getRpcEndpoint()}`);
     }
     /**
@@ -63,6 +66,24 @@ class XDCService {
         return address;
     }
     /**
+     * Generate new XDC address (production-ready)
+     * Creates a random wallet and returns XDC-formatted address
+     * IMPORTANT: Store privateKey securely (encrypted in DB or vault)
+     */
+    generateAddress() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Generate a new random wallet using ethers.js
+            const wallet = ethers_1.Wallet.createRandom();
+            // Convert Ethereum-style address to XDC format (xdc prefix instead of 0x)
+            const xdcAddress = this.ethToXdc(wallet.address);
+            console.log(`✅ Generated new XDC address: ${xdcAddress}`);
+            return {
+                address: xdcAddress,
+                privateKey: wallet.privateKey // MUST be stored encrypted
+            };
+        });
+    }
+    /**
      * Get XDC balance
      */
     getBalance(address) {
@@ -80,91 +101,34 @@ class XDCService {
         });
     }
     /**
-     * Get XRC20 token balance
-     */
-    getTokenBalance(tokenAddress, holderAddress) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const tokenEthAddress = this.xdcToEth(tokenAddress);
-                const holderEthAddress = this.xdcToEth(holderAddress);
-                // ERC20 balanceOf function ABI
-                const minABI = [
-                    {
-                        constant: true,
-                        inputs: [{ name: '_owner', type: 'address' }],
-                        name: 'balanceOf',
-                        outputs: [{ name: 'balance', type: 'uint256' }],
-                        type: 'function'
-                    },
-                    {
-                        constant: true,
-                        inputs: [],
-                        name: 'decimals',
-                        outputs: [{ name: '', type: 'uint8' }],
-                        type: 'function'
-                    }
-                ];
-                const contract = new this.web3.eth.Contract(minABI, tokenEthAddress);
-                const balance = yield contract.methods.balanceOf(holderEthAddress).call();
-                const decimals = yield contract.methods.decimals().call();
-                return this.web3.utils.fromWei(balance.toString(), 'ether');
-            }
-            catch (error) {
-                console.error(`❌ XDC getTokenBalance error:`, error.message);
-                return '0';
-            }
-        });
-    }
-    /**
-     * Get transaction details
-     */
-    getTransaction(hash) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const tx = yield this.web3.eth.getTransaction(hash);
-                if (!tx) {
-                    return null;
-                }
-                const receipt = yield this.web3.eth.getTransactionReceipt(hash);
-                const block = yield this.web3.eth.getBlock(tx.blockNumber);
-                return {
-                    hash: tx.hash,
-                    from: this.ethToXdc(tx.from),
-                    to: this.ethToXdc(tx.to || ''),
-                    value: this.web3.utils.fromWei(tx.value.toString(), 'ether'),
-                    gas: tx.gas.toString(),
-                    gasPrice: this.web3.utils.fromWei(tx.gasPrice.toString(), 'gwei'),
-                    blockNumber: tx.blockNumber,
-                    timestamp: Number(block.timestamp),
-                    status: (receipt === null || receipt === void 0 ? void 0 : receipt.status) || false
-                };
-            }
-            catch (error) {
-                console.error(`❌ XDC getTransaction error:`, error.message);
-                return null;
-            }
-        });
-    }
-    /**
-     * Monitor address for new transactions
+     * Monitor address for deposits (production pattern)
+     * Polls blockchain for new transactions to the deposit address
+     * @param address - XDC address to monitor
+     * @param callback - Function called when deposit detected
+     * @param interval - Polling interval in milliseconds (default 15s)
      */
     monitorAddress(address_1, callback_1) {
-        return __awaiter(this, arguments, void 0, function* (address, callback, interval = 15000 // XDC block time ~2 seconds, check every 15s
-        ) {
-            console.log(`👁️ Monitoring XDC address: ${address}`);
+        return __awaiter(this, arguments, void 0, function* (address, callback, interval = 15000) {
             const ethAddress = this.xdcToEth(address);
-            let lastBlock = yield this.web3.eth.getBlockNumber();
+            let lastBlock = Number(yield this.web3.eth.getBlockNumber());
+            console.log(`🔍 Started monitoring XDC address: ${address} from block ${lastBlock}`);
             const intervalId = setInterval(() => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    const currentBlock = yield this.web3.eth.getBlockNumber();
+                    const currentBlock = Number(yield this.web3.eth.getBlockNumber());
+                    // Check for new blocks
                     if (currentBlock > lastBlock) {
-                        // Check blocks for transactions to this address
+                        console.log(`📦 Checking XDC blocks ${lastBlock + 1} to ${currentBlock}`);
+                        // Scan each new block for transactions
                         for (let i = lastBlock + 1; i <= currentBlock; i++) {
                             const block = yield this.web3.eth.getBlock(i, true);
                             if (block && block.transactions) {
                                 for (const tx of block.transactions) {
-                                    if (tx.to && tx.to.toLowerCase() === ethAddress.toLowerCase() && tx.value && tx.value.toString() !== '0') {
-                                        console.log(`💰 New XDC transaction detected: ${tx.hash}`);
+                                    // Check if transaction is TO our address AND has value
+                                    if (tx.to &&
+                                        tx.to.toLowerCase() === ethAddress.toLowerCase() &&
+                                        tx.value &&
+                                        tx.value.toString() !== '0') {
+                                        console.log(`💰 XDC deposit detected! TX: ${tx.hash}`);
                                         const transaction = yield this.getTransaction(tx.hash);
                                         if (transaction) {
                                             callback(transaction);
@@ -177,107 +141,82 @@ class XDCService {
                     }
                 }
                 catch (error) {
-                    console.error(`❌ XDC monitoring error:`, error.message);
+                    console.error('❌ Error monitoring XDC address:', error);
                 }
             }), interval);
             return intervalId;
         });
     }
     /**
-     * Monitor XRC20 token transfers
+     * Get transaction details
      */
-    monitorTokenTransfers(tokenAddress_1, recipientAddress_1, callback_1) {
-        return __awaiter(this, arguments, void 0, function* (tokenAddress, recipientAddress, callback, interval = 15000) {
-            console.log(`👁️ Monitoring XRC20 token ${tokenAddress} for ${recipientAddress}`);
-            const tokenEthAddress = this.xdcToEth(tokenAddress);
-            const recipientEthAddress = this.xdcToEth(recipientAddress);
-            // Transfer event signature
-            const transferEventSignature = this.web3.utils.sha3('Transfer(address,address,uint256)');
-            let lastBlock = yield this.web3.eth.getBlockNumber();
-            const intervalId = setInterval(() => __awaiter(this, void 0, void 0, function* () {
-                try {
-                    const currentBlock = yield this.web3.eth.getBlockNumber();
-                    if (currentBlock > lastBlock) {
-                        const logs = yield this.web3.eth.getPastLogs({
-                            fromBlock: lastBlock + 1,
-                            toBlock: currentBlock,
-                            address: tokenEthAddress,
-                            topics: [
-                                transferEventSignature,
-                                null,
-                                this.web3.utils.padLeft(recipientEthAddress, 64)
-                            ]
-                        });
-                        for (const log of logs) {
-                            console.log(`💰 New XRC20 transfer detected`);
-                            callback(log);
-                        }
-                        lastBlock = currentBlock;
-                    }
-                }
-                catch (error) {
-                    console.error(`❌ XDC token monitoring error:`, error.message);
-                }
-            }), interval);
-            return intervalId;
-        });
-    }
-    /**
-     * Get XRC20 token info
-     */
-    getTokenInfo(tokenAddress) {
+    getTransaction(hash) {
         return __awaiter(this, void 0, void 0, function* () {
+            var _a;
             try {
-                const tokenEthAddress = this.xdcToEth(tokenAddress);
-                const minABI = [
-                    {
-                        constant: true,
-                        inputs: [],
-                        name: 'name',
-                        outputs: [{ name: '', type: 'string' }],
-                        type: 'function'
-                    },
-                    {
-                        constant: true,
-                        inputs: [],
-                        name: 'symbol',
-                        outputs: [{ name: '', type: 'string' }],
-                        type: 'function'
-                    },
-                    {
-                        constant: true,
-                        inputs: [],
-                        name: 'decimals',
-                        outputs: [{ name: '', type: 'uint8' }],
-                        type: 'function'
-                    },
-                    {
-                        constant: true,
-                        inputs: [],
-                        name: 'totalSupply',
-                        outputs: [{ name: '', type: 'uint256' }],
-                        type: 'function'
-                    }
-                ];
-                const contract = new this.web3.eth.Contract(minABI, tokenEthAddress);
-                const [name, symbol, decimals, totalSupply] = yield Promise.all([
-                    contract.methods.name().call(),
-                    contract.methods.symbol().call(),
-                    contract.methods.decimals().call(),
-                    contract.methods.totalSupply().call()
-                ]);
+                const tx = yield this.web3.eth.getTransaction(hash);
+                if (!tx) {
+                    return null;
+                }
+                const receipt = yield this.web3.eth.getTransactionReceipt(hash);
+                const resolvedBlockNumber = tx.blockNumber != null ? Number(tx.blockNumber) : Number(yield this.web3.eth.getBlockNumber());
+                const block = yield this.web3.eth.getBlock(resolvedBlockNumber);
+                const normalizedBlockNumber = Number((_a = tx.blockNumber) !== null && _a !== void 0 ? _a : block.number);
+                const statusVal = receipt === null || receipt === void 0 ? void 0 : receipt.status;
+                const success = (() => {
+                    if (typeof statusVal === 'boolean')
+                        return statusVal;
+                    if (typeof statusVal === 'number')
+                        return statusVal === 1;
+                    if (typeof statusVal === 'string')
+                        return statusVal === '0x1' || statusVal === '1';
+                    if (typeof statusVal === 'bigint')
+                        return String(statusVal) === '1';
+                    return false;
+                })();
                 return {
-                    address: this.ethToXdc(tokenEthAddress),
-                    name: name,
-                    symbol: symbol,
-                    decimals: Number(decimals),
-                    totalSupply: totalSupply.toString()
+                    hash: tx.hash,
+                    from: this.ethToXdc(tx.from),
+                    to: this.ethToXdc(tx.to || ''),
+                    value: this.web3.utils.fromWei(tx.value.toString(), 'ether'),
+                    gas: tx.gas.toString(),
+                    gasPrice: this.web3.utils.fromWei(tx.gasPrice.toString(), 'gwei'),
+                    blockNumber: normalizedBlockNumber,
+                    timestamp: Number(block.timestamp),
+                    status: success
                 };
             }
             catch (error) {
-                console.error(`❌ XDC getTokenInfo error:`, error.message);
+                console.error(`❌ XDC getTransaction error:`, error.message);
                 return null;
             }
+        });
+    }
+    /**
+     * Send XDC transaction (production pattern)
+     * Signs and broadcasts transaction to send XDC to recipient
+     * @param privateKey - Sender's private key (from secure storage)
+     * @param toAddress - Recipient XDC address
+     * @param amount - Amount in XDC (as string)
+     * @returns Transaction hash
+     */
+    sendTransaction(privateKey, toAddress, amount) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Create wallet from private key
+            const wallet = new ethers_1.Wallet(privateKey, this.provider);
+            const ethToAddress = this.xdcToEth(toAddress);
+            console.log(`📤 Sending ${amount} XDC to ${toAddress}...`);
+            // Send transaction
+            const tx = yield wallet.sendTransaction({
+                to: ethToAddress,
+                value: (0, ethers_1.parseEther)(amount)
+            });
+            console.log(`✅ XDC transaction sent! Hash: ${tx.hash}`);
+            console.log(`⏳ Waiting for confirmation...`);
+            // Wait for transaction to be mined
+            yield tx.wait();
+            console.log(`✅ XDC transaction confirmed in block`);
+            return tx.hash;
         });
     }
     /**
@@ -288,28 +227,6 @@ class XDCService {
         const xdcPattern = /^xdc[a-fA-F0-9]{40}$/;
         const ethPattern = /^0x[a-fA-F0-9]{40}$/;
         return xdcPattern.test(address) || ethPattern.test(address);
-    }
-    /**
-     * Estimate gas for transaction
-     */
-    estimateGas(from, to, value) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                const ethFrom = this.xdcToEth(from);
-                const ethTo = this.xdcToEth(to);
-                const valueWei = this.web3.utils.toWei(value, 'ether');
-                const gasEstimate = yield this.web3.eth.estimateGas({
-                    from: ethFrom,
-                    to: ethTo,
-                    value: valueWei
-                });
-                return gasEstimate.toString();
-            }
-            catch (error) {
-                console.error(`❌ XDC estimateGas error:`, error.message);
-                return '21000'; // Default gas limit for simple transfer
-            }
-        });
     }
     /**
      * Get current gas price
@@ -333,8 +250,11 @@ class XDCService {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const receipt = yield this.web3.eth.sendSignedTransaction(signedTx);
-                console.log(`✅ XDC transaction sent: ${receipt.transactionHash}`);
-                return receipt.transactionHash;
+                const txHash = typeof receipt.transactionHash === 'string'
+                    ? receipt.transactionHash
+                    : this.web3.utils.bytesToHex(receipt.transactionHash);
+                console.log(`✅ XDC transaction sent: ${txHash}`);
+                return txHash;
             }
             catch (error) {
                 console.error(`❌ XDC sendSignedTransaction error:`, error.message);
@@ -373,7 +293,7 @@ class XDCService {
             try {
                 const ethAddress = this.xdcToEth(address);
                 const nonce = yield this.web3.eth.getTransactionCount(ethAddress);
-                return nonce;
+                return Number(nonce);
             }
             catch (error) {
                 console.error(`❌ XDC getNonce error:`, error.message);
