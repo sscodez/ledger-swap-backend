@@ -33,10 +33,10 @@ const tokenSchema: Schema = new Schema({
     enum: ['native', 'erc20', 'bep20', 'trc20', 'xrc20', 'stellar-asset', 'xrp-trustline', 'iota-token'],
     required: true
   },
-  contractAddress: { type: String, index: true },
+  tokenAddress: { type: String, index: true },
   issuerAddress: { type: String },
   decimals: { type: Number, required: true, default: 18 },
-  iconUrl: { type: String },
+  icon: { type: String },
   coingeckoId: { type: String, index: true },
   minSwapAmount: { type: String, default: '0' },
   maxSwapAmount: { type: String, default: '1000000000' },
