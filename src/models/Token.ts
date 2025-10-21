@@ -25,13 +25,13 @@ export interface IToken extends Document {
 
 const tokenSchema: Schema = new Schema({
   key: { type: String,  unique: true, index: true },
-  symbol: { type: String, required: true, index: true },
+  symbol: { type: String, , index: true },
   name: { type: String, required: true },
   chainKey: { type: String, required: true, index: true },
   tokenType: {
     type: String,
     enum: ['native', 'erc20', 'bep20', 'trc20', 'xrc20', 'stellar-asset', 'xrp-trustline', 'iota-token'],
-    required: true
+  
   },
   tokenAddress: { type: String, index: true },
   issuerAddress: { type: String },
