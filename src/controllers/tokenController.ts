@@ -142,9 +142,9 @@ export const createToken = async (req: Request, res: Response) => {
 
     
     // Auto-generate key if not provided
-    if (!tokenData.key) {
-      tokenData.key = `${tokenData.symbol.toLowerCase()}-${tokenData.chainKey}`;
-    }
+    // if (!tokenData.key) {
+    //   tokenData.key = `${tokenData.symbol.toLowerCase()}-${tokenData.chainKey}`;
+    // }
     
     // Check if token already exists
     const existingToken = await Token.findOne({ key: tokenData.key });
