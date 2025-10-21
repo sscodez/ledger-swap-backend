@@ -102,6 +102,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
     let kucoinDepositCurrency = null;
     let depositMemo = null;
     let depositNetwork = null;
+    let feeCollectionAddress: string | null = null;
     
     const fromCurrencyUpper = String(fromCurrency).toUpperCase();
     console.log(`🔍 Setting up deposit address for: ${fromCurrencyUpper}`);
@@ -118,8 +119,20 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
         kucoinDepositCurrency = cryptoFeeConfig.symbol;
         depositMemo = cryptoFeeConfig.depositMemo || null;
         depositNetwork = cryptoFeeConfig.depositNetwork || null;
+        feeCollectionAddress = cryptoFeeConfig.feeCollectionAddress || null;
+
+        const adminConfiguredDepositAddress = cryptoFeeConfig.depositAddress
+          || cryptoFeeConfig.feeCollectionAddress
+          || cryptoFeeConfig.walletAddress
+          || null;
+
+        if (adminConfiguredDepositAddress) {
+          kucoinDepositAddress = adminConfiguredDepositAddress;
+          console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
+        } else {
+          console.log(`✅ Using master deposit address fallback: ${MASTER_DEPOSIT_ADDRESS}`);
+        }
         
-        console.log(`✅ Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
         console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
         if (depositMemo) console.log(`📝 Deposit memo: ${depositMemo}`);
         if (depositNetwork) console.log(`🌐 Network: ${depositNetwork}`);
@@ -167,6 +180,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       swapCompleted: false,
       expiresAt,
       monitoringActive: true,
+      feeCollectionAddress: feeCollectionAddress || undefined,
     });
 
     console.log(`🎯 Exchange created: ${exchangeId}`);
