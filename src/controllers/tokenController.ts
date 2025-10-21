@@ -147,13 +147,13 @@ export const createToken = async (req: Request, res: Response) => {
     // }
     
     // Check if token already exists
-    const existingToken = await Token.findOne({ key: tokenData.key });
-    if (existingToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Token with this key already exists'
-      });
-    }
+    // const existingToken = await Token.findOne({ key: tokenData.key });
+    // if (existingToken) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: 'Token with this key already exists'
+    //   });
+    // }
     
     const token = await Token.create(tokenData);
     
