@@ -23,6 +23,8 @@ export interface IExchangeHistory extends Document {
   // KuCoin Integration Fields
   kucoinDepositAddress?: string; // Generated deposit address for this exchange
   kucoinDepositCurrency?: string; // Currency for the deposit address
+  depositMemo?: string; // Memo/tag required for the deposit (if any)
+  depositNetwork?: string; // Network the deposit should be sent on
   kucoinOrderId?: string; // KuCoin convert order ID
   depositReceived?: boolean; // Whether deposit has been received
   depositAmount?: number; // Actual amount deposited
@@ -119,6 +121,13 @@ const exchangeHistorySchema: Schema = new Schema({
     index: true, // Index for quick lookup by deposit address
   },
   kucoinDepositCurrency: {
+    type: String,
+    index: true,
+  },
+  depositMemo: {
+    type: String,
+  },
+  depositNetwork: {
     type: String,
     index: true,
   },

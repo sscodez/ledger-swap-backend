@@ -95,9 +95,10 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
   const computedStatus = allowedStatuses.has(String(status)) ? (String(status) as any) : 'pending';
 
   try {
-    // Master deposit address for all transactions
-  
-    let kucoinDepositAddress = '';
+    // Master deposit address fallback (legacy)
+    const MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
+
+    let kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
     let kucoinDepositCurrency = null;
     let depositMemo = null;
     let depositNetwork = null;
@@ -129,9 +130,9 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
           kucoinDepositAddress = adminConfiguredDepositAddress;
           console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
         } else {
-
+          console.log(`ℹ️ No admin deposit address configured, using master fallback: ${MASTER_DEPOSIT_ADDRESS}`);
         }
-        
+
         console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
         if (depositMemo) console.log(`📝 Deposit memo: ${depositMemo}`);
         if (depositNetwork) console.log(`🌐 Network: ${depositNetwork}`);
@@ -143,13 +144,14 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
           : fromCurrencyUpper;
         
         console.log(`⚠️ No fee configuration found for ${fromCurrencyUpper}, using defaults`);
-
+        console.log(`🔄 Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
       }
     } catch (configError: any) {
       console.error('❌ Error fetching crypto fee configuration:', configError.message);
       // Still use master address even if config fails
       kucoinDepositCurrency = fromCurrencyUpper;
       depositNetwork = fromCurrencyUpper;
+      kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
     }
 
     // Set expiration time (5 minutes from now)
@@ -175,6 +177,8 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       // KuCoin Integration Fields
       kucoinDepositAddress,
       kucoinDepositCurrency,
+      depositMemo: depositMemo || undefined,
+      depositNetwork: depositNetwork || undefined,
       depositReceived: false,
       swapCompleted: false,
       expiresAt,
@@ -214,8 +218,8 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
       exchangeId, 
       record,
       depositAddress: kucoinDepositAddress,
-      depositMemo: depositMemo,
-      depositNetwork: depositNetwork,
+      depositMemo,
+      depositNetwork,
       expiresAt: expiresAt.toISOString(),
       automatedMonitoring: !!kucoinDepositAddress, // Indicate if automated monitoring is active
       addressSource: kucoinDepositAddress ? 'admin_configured' : 'not_available'
