@@ -120,42 +120,33 @@ export const createToken = async (req: Request, res: Response) => {
   try {
     const tokenData = req.body;
     
-    // Verify chain exists
-    // if (!Object.values(ChainEnum).includes(tokenData.chainKey)) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: `Invalid chain key. Must be one of: ${Object.values(ChainEnum).join(', ')}`,
-    //   });
-    // }
-
-
-
-    const tokenaddress = await Chain.findOne({ key: tokenData.tokenAddress });
-  
-    if (tokenaddress) {
+    // Validate required fields
+    if (!tokenData.name || !tokenData.chainKey || !tokenData.tokenAddress) {
       return res.status(400).json({
         success: false,
-        message: 'Token address already exists'
+        message: 'Name, chainKey, and tokenAddress are required'
       });
     }
 
+    // Check if token with same tokenAddress already exists
+    const existingToken = await Token.findOne({ tokenAddress: tokenData.tokenAddress });
+    if (existingToken) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token with this address already exists'
+      });
+    }
 
+    // Generate a unique key for the token to avoid null key issues
+    const uniqueKey = `${tokenData.tokenAddress.toLowerCase()}-${tokenData.chainKey}`;
     
-    // Auto-generate key if not provided
-    // if (!tokenData.key) {
-    //   tokenData.key = `${tokenData.symbol.toLowerCase()}-${tokenData.chainKey}`;
-    // }
+    // Create token with generated key
+    const tokenToCreate = {
+      ...tokenData,
+      key: uniqueKey // Add the key field to avoid null key errors
+    };
     
-    // Check if token already exists
-    // const existingToken = await Token.findOne({ key: tokenData.key });
-    // if (existingToken) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: 'Token with this key already exists'
-    //   });
-    // }
-    
-    const token = await Token.create(tokenData);
+    const token = await Token.create(tokenToCreate);
     
     res.status(201).json({
       success: true,
@@ -296,7 +287,7 @@ export const bulkCreateTokens = async (req: Request, res: Response) => {
     // Auto-generate keys
     const processedTokens = tokens.map(token => ({
       ...token,
-      key: token.key || `${token.symbol.toLowerCase()}-${token.chainKey}`
+      key: token.key || `${token.symbol?.toLowerCase()}-${token.chainKey}`
     }));
     
     const createdTokens = await Token.insertMany(processedTokens, { ordered: false });
