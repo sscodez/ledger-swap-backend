@@ -24,7 +24,7 @@ export interface IToken extends Document {
 }
 
 const tokenSchema: Schema = new Schema({
-  key: { type: String, required: true, unique: true, index: true },
+  key: { type: String,  unique: true, index: true },
   symbol: { type: String, required: true, index: true },
   name: { type: String, required: true },
   chainKey: { type: String, required: true, index: true },
