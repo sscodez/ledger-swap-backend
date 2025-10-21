@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IToken extends Document {
-  key: string; // unique token key, e.g., 'usdc-ethereum', 'xrp-trustline'
+  // key: string; // unique token key, e.g., 'usdc-ethereum', 'xrp-trustline'
   symbol: string; // e.g., 'USDC', 'XRP', 'USDT'
   name: string; // e.g., 'USD Coin', 'Ripple'
   chainKey: string; // reference to Chain.key: 'bitcoin', 'stellar', 'xrp-ledger', 'xdc-network', 'iota'
@@ -24,7 +24,7 @@ export interface IToken extends Document {
 }
 
 const tokenSchema: Schema = new Schema({
-  key: { type: String,   index: true },
+  // key: { type: String,   index: true },
   symbol: { type: String,  index: true },
   name: { type: String, required: true },
   chainKey: { type: String, required: true, index: true },
