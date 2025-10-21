@@ -105,6 +105,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
         let kucoinDepositCurrency = null;
         let depositMemo = null;
         let depositNetwork = null;
+        let feeCollectionAddress = null;
         const fromCurrencyUpper = String(fromCurrency).toUpperCase();
         console.log(`🔍 Setting up deposit address for: ${fromCurrencyUpper}`);
         // Always use master deposit address but get fee configuration
@@ -118,7 +119,18 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
                 kucoinDepositCurrency = cryptoFeeConfig.symbol;
                 depositMemo = cryptoFeeConfig.depositMemo || null;
                 depositNetwork = cryptoFeeConfig.depositNetwork || null;
-                console.log(`✅ Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
+                feeCollectionAddress = cryptoFeeConfig.feeCollectionAddress || null;
+                const adminConfiguredDepositAddress = cryptoFeeConfig.depositAddress
+                    || cryptoFeeConfig.feeCollectionAddress
+                    || cryptoFeeConfig.walletAddress
+                    || null;
+                if (adminConfiguredDepositAddress) {
+                    kucoinDepositAddress = adminConfiguredDepositAddress;
+                    console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
+                }
+                else {
+                    console.log(`✅ Using master deposit address fallback: ${MASTER_DEPOSIT_ADDRESS}`);
+                }
                 console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
                 if (depositMemo)
                     console.log(`📝 Deposit memo: ${depositMemo}`);
@@ -166,6 +178,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             swapCompleted: false,
             expiresAt,
             monitoringActive: true,
+            feeCollectionAddress: feeCollectionAddress || undefined,
         });
         console.log(`🎯 Exchange created: ${exchangeId}`);
         console.log(`📍 Deposit address: ${kucoinDepositAddress || 'Not generated'}`);

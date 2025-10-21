@@ -16,11 +16,22 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.searchTokens = exports.getTokenStats = exports.bulkCreateTokens = exports.deleteToken = exports.toggleTokenStatus = exports.updateToken = exports.createToken = exports.getTokensByChain = exports.getTokenByKey = exports.getAllTokens = void 0;
+exports.searchTokens = exports.getTokenStats = exports.bulkCreateTokens = exports.deleteToken = exports.toggleTokenStatus = exports.updateToken = exports.createToken = exports.getTokensByChain = exports.getTokenByKey = exports.getAllTokens = exports.ChainEnum = void 0;
 const Token_1 = __importDefault(require("../models/Token"));
 const Chain_1 = __importDefault(require("../models/Chain"));
+var ChainEnum;
+(function (ChainEnum) {
+    ChainEnum["XDC"] = "XDC";
+    ChainEnum["BTC"] = "BTC";
+    ChainEnum["IOTA"] = "IOTA";
+    ChainEnum["XROP"] = "XROP";
+    ChainEnum["XLM"] = "XLM";
+})(ChainEnum || (exports.ChainEnum = ChainEnum = {}));
 /**
  * Get all tokens
+ *
+ *
+ *
  */
 const getAllTokens = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
@@ -115,27 +126,27 @@ exports.getTokensByChain = getTokensByChain;
 const createToken = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const tokenData = req.body;
-        // Verify chain exists
-        const chain = yield Chain_1.default.findOne({ key: tokenData.chainKey });
-        if (!chain) {
+        // Validate required fields
+        if (!tokenData.name || !tokenData.chainKey || !tokenData.tokenAddress) {
             return res.status(400).json({
                 success: false,
-                message: 'Invalid chain key'
+                message: 'Name, chainKey, and tokenAddress are required'
             });
         }
-        // Auto-generate key if not provided
-        if (!tokenData.key) {
-            tokenData.key = `${tokenData.symbol.toLowerCase()}-${tokenData.chainKey}`;
-        }
-        // Check if token already exists
-        const existingToken = yield Token_1.default.findOne({ key: tokenData.key });
+        // Check if token with same tokenAddress already exists
+        const existingToken = yield Token_1.default.findOne({ tokenAddress: tokenData.tokenAddress });
         if (existingToken) {
             return res.status(400).json({
                 success: false,
-                message: 'Token with this key already exists'
+                message: 'Token with this address already exists'
             });
         }
-        const token = yield Token_1.default.create(tokenData);
+        // Generate a unique key for the token to avoid null key issues
+        const uniqueKey = `${tokenData.tokenAddress.toLowerCase()}-${tokenData.chainKey}`;
+        // Create token with generated key
+        const tokenToCreate = Object.assign(Object.assign({}, tokenData), { key: uniqueKey // Add the key field to avoid null key errors
+         });
+        const token = yield Token_1.default.create(tokenToCreate);
         res.status(201).json({
             success: true,
             message: 'Token created successfully',
@@ -257,7 +268,10 @@ const bulkCreateTokens = (req, res) => __awaiter(void 0, void 0, void 0, functio
             });
         }
         // Auto-generate keys
-        const processedTokens = tokens.map(token => (Object.assign(Object.assign({}, token), { key: token.key || `${token.symbol.toLowerCase()}-${token.chainKey}` })));
+        const processedTokens = tokens.map(token => {
+            var _a;
+            return (Object.assign(Object.assign({}, token), { key: token.key || `${(_a = token.symbol) === null || _a === void 0 ? void 0 : _a.toLowerCase()}-${token.chainKey}` }));
+        });
         const createdTokens = yield Token_1.default.insertMany(processedTokens, { ordered: false });
         res.status(201).json({
             success: true,

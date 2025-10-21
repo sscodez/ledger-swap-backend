@@ -36,18 +36,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const tokenSchema = new mongoose_1.Schema({
     key: { type: String, required: true, unique: true, index: true },
-    symbol: { type: String, required: true, index: true },
+    symbol: { type: String, index: true },
     name: { type: String, required: true },
     chainKey: { type: String, required: true, index: true },
     tokenType: {
         type: String,
         enum: ['native', 'erc20', 'bep20', 'trc20', 'xrc20', 'stellar-asset', 'xrp-trustline', 'iota-token'],
-        required: true
     },
-    contractAddress: { type: String, index: true },
+    tokenAddress: { type: String, index: true },
     issuerAddress: { type: String },
     decimals: { type: Number, required: true, default: 18 },
-    iconUrl: { type: String },
+    icon: { type: String },
     coingeckoId: { type: String, index: true },
     minSwapAmount: { type: String, default: '0' },
     maxSwapAmount: { type: String, default: '1000000000' },

@@ -96,9 +96,8 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
 
   try {
     // Master deposit address for all transactions
-    const MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
-    
-    let kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
+  
+    let kucoinDepositAddress = '';
     let kucoinDepositCurrency = null;
     let depositMemo = null;
     let depositNetwork = null;
@@ -130,7 +129,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
           kucoinDepositAddress = adminConfiguredDepositAddress;
           console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
         } else {
-          console.log(`✅ Using master deposit address fallback: ${MASTER_DEPOSIT_ADDRESS}`);
+
         }
         
         console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
@@ -144,7 +143,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
           : fromCurrencyUpper;
         
         console.log(`⚠️ No fee configuration found for ${fromCurrencyUpper}, using defaults`);
-        console.log(`🔄 Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
+
       }
     } catch (configError: any) {
       console.error('❌ Error fetching crypto fee configuration:', configError.message);
