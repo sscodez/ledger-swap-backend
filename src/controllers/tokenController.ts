@@ -7,8 +7,20 @@ import { Request, Response } from 'express';
 import Token, { IToken } from '../models/Token';
 import Chain from '../models/Chain';
 
+
+export enum ChainEnum {
+  XDC = 'XDC',
+  BTC = 'BTC',
+  IOTA = 'IOTA',
+  XROP = 'XROP',
+  XLM = 'XLM',
+}
+
 /**
  * Get all tokens
+ * 
+ * 
+ * 
  */
 export const getAllTokens = async (req: Request, res: Response) => {
   try {
@@ -109,13 +121,25 @@ export const createToken = async (req: Request, res: Response) => {
     const tokenData = req.body;
     
     // Verify chain exists
-    const chain = await Chain.findOne({ key: tokenData.chainKey });
-    if (!chain) {
+    if (!Object.values(ChainEnum).includes(tokenData.chainKey)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid chain key'
+        message: `Invalid chain key. Must be one of: ${Object.values(ChainEnum).join(', ')}`,
       });
     }
+
+
+
+    const tokenaddress = await Chain.findOne({ key: tokenData.tokenAddress });
+  
+    if (tokenaddress) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token address already exists'
+      });
+    }
+
+
     
     // Auto-generate key if not provided
     if (!tokenData.key) {
