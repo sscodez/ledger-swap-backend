@@ -121,12 +121,12 @@ export const createToken = async (req: Request, res: Response) => {
     const tokenData = req.body;
     
     // Verify chain exists
-    if (!Object.values(ChainEnum).includes(tokenData.chainKey)) {
-      return res.status(400).json({
-        success: false,
-        message: `Invalid chain key. Must be one of: ${Object.values(ChainEnum).join(', ')}`,
-      });
-    }
+    // if (!Object.values(ChainEnum).includes(tokenData.chainKey)) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Invalid chain key. Must be one of: ${Object.values(ChainEnum).join(', ')}`,
+    //   });
+    // }
 
 
 
