@@ -99,7 +99,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
     const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
     const computedStatus = allowedStatuses.has(String(status)) ? String(status) : 'pending';
     try {
-        // Master deposit address for all transactions
+        // Master deposit address fallback (legacy)
         const MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
         let kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
         let kucoinDepositCurrency = null;
@@ -129,7 +129,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
                     console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
                 }
                 else {
-                    console.log(`✅ Using master deposit address fallback: ${MASTER_DEPOSIT_ADDRESS}`);
+                    console.log(`ℹ️ No admin deposit address configured, using master fallback: ${MASTER_DEPOSIT_ADDRESS}`);
                 }
                 console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
                 if (depositMemo)
@@ -152,6 +152,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             // Still use master address even if config fails
             kucoinDepositCurrency = fromCurrencyUpper;
             depositNetwork = fromCurrencyUpper;
+            kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
         }
         // Set expiration time (5 minutes from now)
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
@@ -174,6 +175,8 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             // KuCoin Integration Fields
             kucoinDepositAddress,
             kucoinDepositCurrency,
+            depositMemo: depositMemo || undefined,
+            depositNetwork: depositNetwork || undefined,
             depositReceived: false,
             swapCompleted: false,
             expiresAt,
@@ -204,8 +207,8 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             exchangeId,
             record,
             depositAddress: kucoinDepositAddress,
-            depositMemo: depositMemo,
-            depositNetwork: depositNetwork,
+            depositMemo,
+            depositNetwork,
             expiresAt: expiresAt.toISOString(),
             automatedMonitoring: !!kucoinDepositAddress, // Indicate if automated monitoring is active
             addressSource: kucoinDepositAddress ? 'admin_configured' : 'not_available'

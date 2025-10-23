@@ -41,6 +41,7 @@ const automatedSwapRoutes_1 = __importDefault(require("./routes/automatedSwapRou
 const flaggedCheckRoutes_1 = __importDefault(require("./routes/flaggedCheckRoutes"));
 const chainRoutes_1 = __importDefault(require("./routes/chainRoutes"));
 const tokenRoutes_1 = __importDefault(require("./routes/tokenRoutes"));
+const xummRoutes_1 = __importDefault(require("./routes/xummRoutes"));
 const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
 const startAutomatedSwaps_1 = __importDefault(require("./scripts/startAutomatedSwaps"));
 dotenv_1.default.config();
@@ -135,6 +136,7 @@ app.use('/api/automated-swaps', automatedSwapRoutes_1.default);
 app.use('/api/flagged-check', flaggedCheckRoutes_1.default);
 app.use('/api/chains', chainRoutes_1.default);
 app.use('/api/tokens', tokenRoutes_1.default);
+app.use('/api/xumm', xummRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

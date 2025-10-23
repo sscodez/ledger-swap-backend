@@ -111,6 +111,13 @@ const exchangeHistorySchema = new mongoose_1.Schema({
         type: String,
         index: true,
     },
+    depositMemo: {
+        type: String,
+    },
+    depositNetwork: {
+        type: String,
+        index: true,
+    },
     kucoinOrderId: {
         type: String,
         index: true,
