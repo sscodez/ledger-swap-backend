@@ -1,7 +1,6 @@
 import dotenv from 'dotenv';
 import connectDB from '../config/db';
-import { automatedSwapService } from '../services/automatedSwapService';
-import { depositDetectionService } from '../services/depositDetectionService';
+
 import { logger } from '../utils/logger';
 import { initializePrivateKeyManager } from '../utils/privateKeyManager';
 
@@ -60,13 +59,9 @@ async function startAutomatedSwapSystem() {
     logger.info('🔧 Initializing automated swap services...');
 
     // Start deposit detection service
-    await depositDetectionService.startMonitoring();
-    logger.info('✅ deposit detection service started');
-    const swapStatus = automatedSwapService.getSwapQueueStatus();
-    const monitoringStatus = depositDetectionService.getMonitoringStatus();
+
 
     // Display system status
-    displaySystemStatus(swapStatus, monitoringStatus);
 
     // Set up graceful shutdown
     setupGracefulShutdown();
@@ -164,9 +159,7 @@ function setupGracefulShutdown(): void {
 
     try {
       // Stop deposit detection service
-      await depositDetectionService.stopMonitoring();
-      logger.info('✅ Deposit detection service stopped');
-
+   
       logger.info('👋 Automated swap system shutdown complete');
       process.exit(0);
     } catch (error) {
