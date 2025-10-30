@@ -5,7 +5,6 @@ import { XrplEscrow } from "../chains/xrpl";
 
 const CHAINS: Record<string, any> = {
   bitcoin: BitcoinEscrow,
-  ethereum: EthereumEscrow,
   stellar: StellarEscrow,
   xrpl: XrplEscrow
 };
