@@ -28,6 +28,7 @@ import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
 import chainRoutes from './routes/chainRoutes';
 import tokenRoutes from './routes/tokenRoutes';
 import xummRoutes from './routes/xummRoutes';
+import escrowRoutes from './routes/escrowRoutes';
 import kucoinMonitoringService from './services/kucoinMonitoringService';
 import startAutomatedSwapSystem from './scripts/startAutomatedSwaps';
 
@@ -134,6 +135,7 @@ app.use('/api/flagged-check', flaggedCheckRoutes);
 app.use('/api/chains', chainRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/xumm', xummRoutes);
+app.use('/api/escrow', escrowRoutes);
 
 async function start() {
   try {

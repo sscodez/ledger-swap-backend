@@ -13,6 +13,7 @@ const xumm_sdk_1 = require("xumm-sdk");
 const logger_1 = require("../utils/logger");
 class XummService {
     constructor() {
+        this.sdk = null;
         const apiKey = process.env.XUMM_API_KEY;
         const apiSecret = process.env.XUMM_API_SECRET;
         if (!apiKey || !apiSecret) {
@@ -23,41 +24,61 @@ class XummService {
         this.sdk = new xumm_sdk_1.XummSdk(apiKey, apiSecret);
         logger_1.logger.info('XUMM SDK initialized');
     }
-    ensureConfigured() {
+    getSdk() {
         if (!this.sdk) {
             throw new Error('XUMM SDK is not configured');
         }
+        return this.sdk;
     }
     createSignInPayload(account) {
         return __awaiter(this, void 0, void 0, function* () {
-            this.ensureConfigured();
-            const payload = yield this.sdk.payload.create({
+            var _a, _b, _c, _d;
+            const sdk = this.getSdk();
+            const payload = yield sdk.payload.create({
                 txjson: Object.assign({ TransactionType: 'SignIn' }, (account ? { Account: account } : {})),
             });
+            if (!payload) {
+                throw new Error('Failed to create XUMM sign-in payload');
+            }
+            const nextSection = (_a = payload.next) !== null && _a !== void 0 ? _a : {};
+            const nextUrl = typeof nextSection.always === 'string' ? nextSection.always : '';
+            const refs = (_b = payload.refs) !== null && _b !== void 0 ? _b : {};
+            const qrSvg = refs.qr_svg;
+            const expiresAt = payload.expires_at;
+            if (!(refs === null || refs === void 0 ? void 0 : refs.qr_png)) {
+                throw new Error('XUMM payload missing QR PNG reference');
+            }
             return {
-                uuid: payload.uuid,
-                next: payload.next.always,
-                qrPng: payload.refs.qr_png,
-                qrSvg: payload.refs.qr_svg,
-                websocketStatus: payload.refs.websocket_status,
-                pushed: payload.pushed,
-                expiresAt: payload.expires_at,
+                uuid: (_c = payload.uuid) !== null && _c !== void 0 ? _c : '',
+                next: nextUrl,
+                qrPng: refs.qr_png,
+                qrSvg,
+                websocketStatus: refs.websocket_status,
+                pushed: (_d = payload.pushed) !== null && _d !== void 0 ? _d : false,
+                expiresAt,
             };
         });
     }
     getPayloadStatus(uuid) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
-            this.ensureConfigured();
-            const payload = yield this.sdk.payload.get(uuid);
+            var _a, _b, _c, _d, _e, _f;
+            const sdk = this.getSdk();
+            const payload = yield sdk.payload.get(uuid);
+            if (!payload) {
+                throw new Error('Failed to retrieve XUMM payload status');
+            }
+            const meta = (_a = payload.meta) !== null && _a !== void 0 ? _a : {};
+            const response = (_b = payload.response) !== null && _b !== void 0 ? _b : {};
+            const expiresAt = (_c = payload.expires_at) !== null && _c !== void 0 ? _c : undefined;
+            const payloadUuid = (_d = payload.uuid) !== null && _d !== void 0 ? _d : uuid;
             return {
-                uuid: payload.uuid,
-                signed: payload.meta.signed === true,
-                cancelled: payload.meta.cancelled === true,
-                expired: payload.meta.expired === true,
-                account: (_a = payload.response) === null || _a === void 0 ? void 0 : _a.account,
-                txid: (_b = payload.response) === null || _b === void 0 ? void 0 : _b.txid,
-                expiresAt: payload.expires_at || payload.meta.expires_at,
+                uuid: payloadUuid,
+                signed: meta.signed === true,
+                cancelled: meta.cancelled === true,
+                expired: meta.expired === true,
+                account: (_e = response.account) !== null && _e !== void 0 ? _e : null,
+                txid: (_f = response.txid) !== null && _f !== void 0 ? _f : null,
+                expiresAt,
             };
         });
     }
