@@ -44,7 +44,6 @@ const tokenRoutes_1 = __importDefault(require("./routes/tokenRoutes"));
 const xummRoutes_1 = __importDefault(require("./routes/xummRoutes"));
 const escrowRoutes_1 = __importDefault(require("./routes/escrowRoutes"));
 const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
-const startAutomatedSwaps_1 = __importDefault(require("./scripts/startAutomatedSwaps"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -146,29 +145,6 @@ function start() {
             // Start the server
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
-                // Start services after server is running
-                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-                    try {
-                        console.log('🚀 Starting KuCoin monitoring service...');
-                        yield kucoinMonitoringService_1.default.start();
-                    }
-                    catch (error) {
-                        console.error('❌ Failed to start KuCoin monitoring service:', error.message);
-                    }
-                    // Start automated swap system if enabled
-                    if (process.env.ENABLE_AUTOMATED_SWAPS === 'true') {
-                        try {
-                            console.log('🤖 Starting automated swap system...');
-                            yield (0, startAutomatedSwaps_1.default)();
-                        }
-                        catch (error) {
-                            console.error('❌ Failed to start automated swap system:', error.message);
-                        }
-                    }
-                    else {
-                        console.log('ℹ️ Automated swaps disabled. Set ENABLE_AUTOMATED_SWAPS=true to enable.');
-                    }
-                }), 5000); // Wait 5 seconds for server to fully initialize
             });
         }
         catch (err) {
@@ -187,12 +163,26 @@ process.on('uncaughtException', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
     console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-    kucoinMonitoringService_1.default.stop();
+    if (process.env.NODE_ENV !== 'serverless') {
+        kucoinMonitoringService_1.default.stop();
+    }
     process.exit(0);
 });
 process.on('SIGTERM', () => {
     console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-    kucoinMonitoringService_1.default.stop();
+    if (process.env.NODE_ENV !== 'serverless') {
+        kucoinMonitoringService_1.default.stop();
+    }
     process.exit(0);
 });
-start();
+// For Vercel serverless deployment
+if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'serverless') {
+    // Connect to DB once for serverless
+    (0, db_1.default)().catch(err => console.error('DB connection error:', err));
+}
+else {
+    // Start server normally for local/traditional hosting
+    start();
+}
+// Export app for Vercel (must be at top level)
+exports.default = app;

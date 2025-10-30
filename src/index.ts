@@ -144,28 +144,6 @@ async function start() {
     // Start the server
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      
-      // Start services after server is running
-      setTimeout(async () => {
-        try {
-          console.log('🚀 Starting KuCoin monitoring service...');
-          await kucoinMonitoringService.start();
-        } catch (error: any) {
-          console.error('❌ Failed to start KuCoin monitoring service:', error.message);
-        }
-
-        // Start automated swap system if enabled
-        if (process.env.ENABLE_AUTOMATED_SWAPS === 'true') {
-          try {
-            console.log('🤖 Starting automated swap system...');
-            await startAutomatedSwapSystem();
-          } catch (error: any) {
-            console.error('❌ Failed to start automated swap system:', error.message);
-          }
-        } else {
-          console.log('ℹ️ Automated swaps disabled. Set ENABLE_AUTOMATED_SWAPS=true to enable.');
-        }
-      }, 5000); // Wait 5 seconds for server to fully initialize
     });
   } catch (err) {
     console.error('Failed to start server:', err);
@@ -184,14 +162,28 @@ process.on('uncaughtException', (err) => {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-  kucoinMonitoringService.stop();
+  if (process.env.NODE_ENV !== 'serverless') {
+    kucoinMonitoringService.stop();
+  }
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-  kucoinMonitoringService.stop();
+  if (process.env.NODE_ENV !== 'serverless') {
+    kucoinMonitoringService.stop();
+  }
   process.exit(0);
 });
 
-start();
+// For Vercel serverless deployment
+if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'serverless') {
+  // Connect to DB once for serverless
+  connectDB().catch(err => console.error('DB connection error:', err));
+} else {
+  // Start server normally for local/traditional hosting
+  start();
+}
+
+// Export app for Vercel (must be at top level)
+export default app;
