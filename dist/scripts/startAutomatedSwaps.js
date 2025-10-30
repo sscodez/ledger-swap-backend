@@ -14,8 +14,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const dotenv_1 = __importDefault(require("dotenv"));
 const db_1 = __importDefault(require("../config/db"));
-const automatedSwapService_1 = require("../services/automatedSwapService");
-const depositDetectionService_1 = require("../services/depositDetectionService");
 const logger_1 = require("../utils/logger");
 const privateKeyManager_1 = require("../utils/privateKeyManager");
 // Load environment variables
@@ -65,12 +63,7 @@ function startAutomatedSwapSystem() {
             // 4. Initialize automated swap services...
             logger_1.logger.info('🔧 Initializing automated swap services...');
             // Start deposit detection service
-            yield depositDetectionService_1.depositDetectionService.startMonitoring();
-            logger_1.logger.info('✅ deposit detection service started');
-            const swapStatus = automatedSwapService_1.automatedSwapService.getSwapQueueStatus();
-            const monitoringStatus = depositDetectionService_1.depositDetectionService.getMonitoringStatus();
             // Display system status
-            displaySystemStatus(swapStatus, monitoringStatus);
             // Set up graceful shutdown
             setupGracefulShutdown();
             logger_1.logger.info('🎉 Automated swap system is now running 24/7!');
@@ -156,8 +149,6 @@ function setupGracefulShutdown() {
         logger_1.logger.info(`🛑 Received ${signal}, shutting down gracefully...`);
         try {
             // Stop deposit detection service
-            yield depositDetectionService_1.depositDetectionService.stopMonitoring();
-            logger_1.logger.info('✅ Deposit detection service stopped');
             logger_1.logger.info('👋 Automated swap system shutdown complete');
             process.exit(0);
         }
