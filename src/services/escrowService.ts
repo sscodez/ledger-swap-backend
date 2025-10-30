@@ -4,7 +4,7 @@ import { StellarEscrow } from "../chains/stellar";
 import { XrplEscrow } from "../chains/xrpl";
 
 const CHAINS: Record<string, any> = {
-  bitcoin: BitcoinEscrow,
+  // bitcoin: BitcoinEscrow,
   stellar: StellarEscrow,
   xrpl: XrplEscrow
 };
