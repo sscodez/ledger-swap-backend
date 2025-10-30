@@ -12,169 +12,137 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.automatedSwapService = exports.AutomatedSwapService = void 0;
-const logger_1 = require("../utils/logger");
+exports.automatedSwapService = void 0;
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
-const privateKeyManager_1 = require("../utils/privateKeyManager");
+const logger_1 = require("../utils/logger");
+/**
+ * Automated Swap Service
+ * Simple queue-based swap processing without external dependencies
+ */
 class AutomatedSwapService {
     constructor() {
-        this.isInitialized = false;
-        this.swapQueue = new Map();
-        this.processingSwaps = new Set();
-        this.initializeService();
+        this.swapQueue = [];
+        this.isProcessing = false;
+        this.processingInterval = null;
+        logger_1.logger.info('🤖 Automated Swap Service initialized');
     }
     /**
-     * Initialize automated swap service
+     * Add exchange to swap queue
      */
-    initializeService() {
+    addToQueue(exchangeId) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                // Initialize service - simplified version
-                this.isInitialized = true;
-                console.log('🚀 Automated swap service initialized');
-            }
-            catch (error) {
-                console.error('❌ Failed to initialize automated swap service:', error);
-                throw error;
-            }
-        });
-    }
-    /**
-     * Process detected deposit and trigger automated swap
-     */
-    processDeposit(depositEvent) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                console.log(`🔍 Processing deposit for exchange ${depositEvent.exchangeId}`);
-                // Get exchange details from database
-                const exchange = yield ExchangeHistory_1.default.findOne({
-                    exchangeId: depositEvent.exchangeId
-                });
+                const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
                 if (!exchange) {
-                    throw new Error(`Exchange not found: ${depositEvent.exchangeId}`);
+                    logger_1.logger.error(`Exchange ${exchangeId} not found`);
+                    return;
                 }
-                // Update exchange status to processing
-                yield this.updateExchangeStatus(exchange._id, 'processing', {
-                    depositReceived: true,
-                    depositAmount: parseFloat(depositEvent.amount),
-                    depositTxId: depositEvent.txHash
-                });
-                // Simulate swap processing (replace with actual Rubic integration later)
-                setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-                    yield this.updateExchangeStatus(exchange._id, 'completed', {
-                        swapCompleted: true,
-                        withdrawalTxId: 'mock_tx_' + Date.now()
-                    });
-                    console.log(`✅ Mock swap completed for ${depositEvent.exchangeId}`);
-                }), 5000);
+                const queueItem = {
+                    exchangeId,
+                    fromCurrency: exchange.from.currency,
+                    toCurrency: exchange.to.currency,
+                    amount: exchange.from.amount,
+                    recipientAddress: exchange.walletAddress || '',
+                    priority: 1,
+                    addedAt: new Date()
+                };
+                this.swapQueue.push(queueItem);
+                logger_1.logger.info(`✅ Added exchange ${exchangeId} to swap queue`);
+                // Start processing if not already running
+                if (!this.isProcessing) {
+                    this.startProcessing();
+                }
             }
             catch (error) {
-                console.error(`❌ Error processing deposit for ${depositEvent.exchangeId}:`, error);
-                yield this.handleSwapError(depositEvent.exchangeId, error);
+                logger_1.logger.error(`Failed to add exchange to queue: ${error.message}`);
             }
         });
     }
     /**
-     * Update exchange status in database
+     * Start processing swap queue
      */
-    updateExchangeStatus(exchangeId, status, updates) {
-        return __awaiter(this, void 0, void 0, function* () {
-            yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, Object.assign(Object.assign({ status }, updates), { updatedAt: new Date() }), { new: true });
-            console.log(`📝 Exchange ${exchangeId} status updated to: ${status}`);
-        });
+    startProcessing() {
+        if (this.processingInterval)
+            return;
+        this.isProcessing = true;
+        logger_1.logger.info('🚀 Starting swap queue processing');
+        this.processingInterval = setInterval(() => __awaiter(this, void 0, void 0, function* () {
+            yield this.processNextSwap();
+        }), 10000); // Process every 10 seconds
+        // Process immediately
+        this.processNextSwap();
     }
     /**
-     * Execute real swap using Rubic SDK with private keys
+     * Process next swap in queue
      */
-    executeRubicSwap(depositEvent, exchange) {
+    processNextSwap() {
         return __awaiter(this, void 0, void 0, function* () {
-            const fromCurrency = depositEvent.token.toUpperCase();
-            // Get private key for the source currency
-            const privateKey = (0, privateKeyManager_1.getValidatedPrivateKey)(fromCurrency);
-            if (!privateKey) {
-                throw new Error(`No private key configured for ${fromCurrency}. Add ${fromCurrency}_PRIVATE_KEY to .env file`);
+            if (this.swapQueue.length === 0) {
+                return;
             }
-            logger_1.logger.info(`🔐 Using private key for ${fromCurrency} automated swap`);
-            logger_1.logger.info(`💱 Executing swap: ${depositEvent.amount} ${fromCurrency} → ${exchange.to.currency}`);
-            // TODO: Implement actual Rubic SDK integration
-            // This is where you'll integrate with Rubic SDK using the private key
+            const swap = this.swapQueue.shift();
+            if (!swap)
+                return;
             try {
-                // Placeholder for Rubic SDK integration
-                logger_1.logger.info(`🚀 Starting Rubic swap execution...`);
-                // Example Rubic integration structure:
-                /*
-                const rubicSDK = new RubicSDK({
-                  privateKey: privateKey,
-                  rpcEndpoint: getRpcEndpoint(fromCurrency)
+                logger_1.logger.info(`🔄 Processing swap for ${swap.exchangeId}`);
+                logger_1.logger.info(`   ${swap.amount} ${swap.fromCurrency} → ${swap.toCurrency}`);
+                // Update status to processing
+                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: swap.exchangeId }, {
+                    status: 'processing',
+                    notes: 'Swap in progress - manual processing required'
                 });
-                
-                const swapParams = {
-                  fromToken: fromCurrency,
-                  toToken: exchange.to.currency,
-                  amount: depositEvent.amount,
-                  fromAddress: depositEvent.fromAddress,
-                  toAddress: exchange.walletAddress
-                };
-                
-                const swapResult = await rubicSDK.executeSwap(swapParams);
-                */
-                // For now, simulate the swap
-                yield new Promise(resolve => setTimeout(resolve, 3000));
-                logger_1.logger.info(`✅ Rubic swap completed for ${depositEvent.exchangeId}`);
-                return Promise.resolve();
+                // Mark for manual review (no automatic swap execution)
+                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: swap.exchangeId }, {
+                    status: 'in_review',
+                    notes: 'Ready for manual swap execution by admin'
+                });
+                logger_1.logger.info(`✅ Exchange ${swap.exchangeId} marked for manual processing`);
             }
-            catch (swapError) {
-                logger_1.logger.error(`❌ Rubic swap failed for ${depositEvent.exchangeId}:`, swapError.message);
-                throw swapError;
+            catch (error) {
+                logger_1.logger.error(`❌ Failed to process ${swap.exchangeId}: ${error.message}`);
+                yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId: swap.exchangeId }, {
+                    status: 'failed',
+                    errorMessage: error.message,
+                    notes: 'Processing failed - admin intervention required'
+                });
             }
         });
     }
     /**
-     * Handle swap errors
+     * Stop processing
      */
-    handleSwapError(exchangeId, error) {
-        return __awaiter(this, void 0, void 0, function* () {
-            try {
-                yield this.updateExchangeStatus(exchangeId, 'failed', {
-                    swapCompleted: false
-                });
-                // Remove from processing
-                this.swapQueue.delete(exchangeId);
-                this.processingSwaps.delete(exchangeId);
-                console.error(`💥 Swap error handled for ${exchangeId}`);
-            }
-            catch (updateError) {
-                console.error('❌ Error updating failed swap status:', updateError);
-            }
-        });
+    stop() {
+        if (this.processingInterval) {
+            clearInterval(this.processingInterval);
+            this.processingInterval = null;
+            this.isProcessing = false;
+            logger_1.logger.info('🛑 Swap processing stopped');
+        }
     }
     /**
-     * Get current swap queue status
+     * Get queue status
      */
     getSwapQueueStatus() {
         return {
-            queueSize: this.swapQueue.size,
-            processing: this.processingSwaps.size,
-            isInitialized: this.isInitialized
+            queueSize: this.swapQueue.length,
+            isProcessing: this.isProcessing,
+            pendingSwaps: this.swapQueue.map(s => ({
+                exchangeId: s.exchangeId,
+                fromCurrency: s.fromCurrency,
+                toCurrency: s.toCurrency,
+                amount: s.amount
+            }))
         };
     }
     /**
-     * Manual swap execution (for testing/admin)
+     * Manual swap trigger (for admin)
      */
-    executeManualSwap(exchangeId) {
+    triggerManualSwap(exchangeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(`🔧 Manual swap execution triggered for ${exchangeId}`);
-            // Simulate manual swap processing
-            const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
-            if (exchange) {
-                yield this.updateExchangeStatus(exchangeId, 'completed', {
-                    swapCompleted: true,
-                    withdrawalTxId: 'manual_tx_' + Date.now()
-                });
-            }
+            logger_1.logger.info(`🔧 Manual swap triggered for ${exchangeId}`);
+            yield this.addToQueue(exchangeId);
         });
     }
 }
-exports.AutomatedSwapService = AutomatedSwapService;
-// Singleton instance
 exports.automatedSwapService = new AutomatedSwapService();
+exports.default = exports.automatedSwapService;

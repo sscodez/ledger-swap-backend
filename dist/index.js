@@ -33,17 +33,12 @@ const cors_1 = __importDefault(require("cors"));
 const uploadRoutes_1 = __importDefault(require("./routes/uploadRoutes"));
 const cryptoRoutes_1 = __importDefault(require("./routes/cryptoRoutes"));
 const blogRoutes_1 = __importDefault(require("./routes/blogRoutes"));
-const kucoinRoutes_1 = __importDefault(require("./routes/kucoinRoutes"));
 const cryptoFeeRoutes_1 = __importDefault(require("./routes/cryptoFeeRoutes"));
 const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
-const tradingRoutes_1 = __importDefault(require("./routes/tradingRoutes"));
-const automatedSwapRoutes_1 = __importDefault(require("./routes/automatedSwapRoutes"));
 const flaggedCheckRoutes_1 = __importDefault(require("./routes/flaggedCheckRoutes"));
 const chainRoutes_1 = __importDefault(require("./routes/chainRoutes"));
 const tokenRoutes_1 = __importDefault(require("./routes/tokenRoutes"));
-const xummRoutes_1 = __importDefault(require("./routes/xummRoutes"));
 const escrowRoutes_1 = __importDefault(require("./routes/escrowRoutes"));
-const kucoinMonitoringService_1 = __importDefault(require("./services/kucoinMonitoringService"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -128,15 +123,12 @@ app.use('/api/disputes', disputesRoutes_1.default);
 app.use('/api/upload', uploadRoutes_1.default);
 app.use('/api/crypto', cryptoRoutes_1.default);
 app.use('/api/blogs', blogRoutes_1.default);
-app.use('/api/kucoin', kucoinRoutes_1.default);
 app.use('/api/crypto-fees', cryptoFeeRoutes_1.default);
 app.use('/api/contacts', contactRoutes_1.default);
-app.use('/api/trading', tradingRoutes_1.default);
-app.use('/api/automated-swaps', automatedSwapRoutes_1.default);
 app.use('/api/flagged-check', flaggedCheckRoutes_1.default);
 app.use('/api/chains', chainRoutes_1.default);
 app.use('/api/tokens', tokenRoutes_1.default);
-app.use('/api/xumm', xummRoutes_1.default);
+// app.use('/api/xumm', xummRoutes);
 app.use('/api/escrow', escrowRoutes_1.default);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
@@ -153,28 +145,6 @@ function start() {
         }
     });
 }
-// Handle graceful shutdown and unhandled errors
-process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled Rejection:', reason);
-});
-process.on('uncaughtException', (err) => {
-    console.error('Uncaught Exception:', err);
-});
-// Graceful shutdown
-process.on('SIGINT', () => {
-    console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-    if (process.env.NODE_ENV !== 'serverless') {
-        kucoinMonitoringService_1.default.stop();
-    }
-    process.exit(0);
-});
-process.on('SIGTERM', () => {
-    console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-    if (process.env.NODE_ENV !== 'serverless') {
-        kucoinMonitoringService_1.default.stop();
-    }
-    process.exit(0);
-});
 // For Vercel serverless deployment
 if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'serverless') {
     // Connect to DB once for serverless

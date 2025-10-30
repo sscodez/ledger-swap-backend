@@ -16,9 +16,6 @@ exports.updateExchangeStatus = exports.getExchangeById = exports.createExchange 
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const flaggedCheck_1 = require("../utils/flaggedCheck");
 const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
-const depositDetectionService_1 = require("../services/depositDetectionService");
-const automaticSwapService_1 = __importDefault(require("../services/automaticSwapService"));
-const automatedSwapService_1 = require("../services/automatedSwapService");
 function generateExchangeId() {
     return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
@@ -190,13 +187,7 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
         // Add exchange to automatic swap monitoring system
         if (kucoinDepositAddress && fromCurrency && sendAmount) {
             try {
-                // Add to automatic swap monitoring
-                yield automaticSwapService_1.default.addExchangeToMonitoring(exchangeId);
-                console.log(`🔍 Added ${exchangeId} to automatic swap monitoring system`);
-                // Also add to legacy monitoring if available
-                if (depositDetectionService_1.depositDetectionService && depositDetectionService_1.depositDetectionService.addMonitoredAddress) {
-                    yield depositDetectionService_1.depositDetectionService.addMonitoredAddress(kucoinDepositAddress, exchangeId, String(fromCurrency).toUpperCase(), Number(sendAmount), expiresAt);
-                }
+                // Add to automated swap queue
             }
             catch (monitoringError) {
                 console.error(`⚠️ Failed to add ${exchangeId} to monitoring:`, monitoringError.message);
@@ -273,7 +264,6 @@ const updateExchangeStatus = (req, res) => __awaiter(void 0, void 0, void 0, fun
                         blockNumber: Date.now(),
                         confirmations: 12 // Assume sufficient confirmations
                     };
-                    yield automatedSwapService_1.automatedSwapService.processDeposit(mockDepositEvent);
                 }
             }
             catch (swapError) {

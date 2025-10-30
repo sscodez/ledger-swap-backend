@@ -19,18 +19,12 @@ import cors from 'cors';
 import uploadRoutes from './routes/uploadRoutes';
 import cryptoRoutes from './routes/cryptoRoutes';
 import blogRoutes from './routes/blogRoutes';
-import kucoinRoutes from './routes/kucoinRoutes';
 import cryptoFeeRoutes from './routes/cryptoFeeRoutes';
 import contactRoutes from './routes/contactRoutes';
-import tradingRoutes from './routes/tradingRoutes';
-import automatedSwapRoutes from './routes/automatedSwapRoutes';
 import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
 import chainRoutes from './routes/chainRoutes';
 import tokenRoutes from './routes/tokenRoutes';
-import xummRoutes from './routes/xummRoutes';
 import escrowRoutes from './routes/escrowRoutes';
-import kucoinMonitoringService from './services/kucoinMonitoringService';
-import startAutomatedSwapSystem from './scripts/startAutomatedSwaps';
 
 dotenv.config();
 const app = express();
@@ -126,15 +120,12 @@ app.use('/api/disputes', disputesRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/crypto', cryptoRoutes);
 app.use('/api/blogs', blogRoutes);
-app.use('/api/kucoin', kucoinRoutes);
 app.use('/api/crypto-fees', cryptoFeeRoutes);
 app.use('/api/contacts', contactRoutes);
-app.use('/api/trading', tradingRoutes);
-app.use('/api/automated-swaps', automatedSwapRoutes);
 app.use('/api/flagged-check', flaggedCheckRoutes);
 app.use('/api/chains', chainRoutes);
 app.use('/api/tokens', tokenRoutes);
-app.use('/api/xumm', xummRoutes);
+// app.use('/api/xumm', xummRoutes);
 app.use('/api/escrow', escrowRoutes);
 
 async function start() {
@@ -151,30 +142,6 @@ async function start() {
   }
 }
 
-// Handle graceful shutdown and unhandled errors
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason);
-});
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-});
-
-// Graceful shutdown
-process.on('SIGINT', () => {
-  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
-  if (process.env.NODE_ENV !== 'serverless') {
-    kucoinMonitoringService.stop();
-  }
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
-  if (process.env.NODE_ENV !== 'serverless') {
-    kucoinMonitoringService.stop();
-  }
-  process.exit(0);
-});
 
 // For Vercel serverless deployment
 if (process.env.VERCEL === '1' || process.env.NODE_ENV === 'serverless') {

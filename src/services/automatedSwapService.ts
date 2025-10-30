@@ -1,215 +1,164 @@
+import ExchangeHistory from '../models/ExchangeHistory';
 import { logger } from '../utils/logger';
-import { notificationService } from './notificationService';
-import ExchangeHistory, { IExchangeHistory } from '../models/ExchangeHistory';
-import { getValidatedPrivateKey, SupportedCurrency, SUPPORTED_CURRENCIES } from '../utils/privateKeyManager';
 
-interface DepositEvent {
+interface SwapQueueItem {
   exchangeId: string;
-  txHash: string;
-  fromAddress: string;
-  toAddress: string;
-  amount: string;
-  token: string;
-  chain: string;
-  blockNumber: number;
-  confirmations: number;
-}
-
-interface SwapConfig {
-  fromToken: string;
-  fromChain: string;
-  toToken: string;
-  toChain: string;
-  amount: string;
+  fromCurrency: string;
+  toCurrency: string;
+  amount: number;
   recipientAddress: string;
-  slippageTolerance: number;
+  priority: number;
+  addedAt: Date;
 }
 
-export class AutomatedSwapService {
-  private isInitialized = false;
-  private swapQueue: Map<string, SwapConfig> = new Map();
-  private processingSwaps: Set<string> = new Set();
+/**
+ * Automated Swap Service
+ * Simple queue-based swap processing without external dependencies
+ */
+class AutomatedSwapService {
+  private swapQueue: SwapQueueItem[] = [];
+  private isProcessing: boolean = false;
+  private processingInterval: NodeJS.Timeout | null = null;
 
   constructor() {
-    this.initializeService();
+    logger.info('🤖 Automated Swap Service initialized');
   }
 
   /**
-   * Initialize automated swap service
+   * Add exchange to swap queue
    */
-  private async initializeService(): Promise<void> {
+  async addToQueue(exchangeId: string): Promise<void> {
     try {
-      // Initialize service - simplified version
-      this.isInitialized = true;
-      console.log('🚀 Automated swap service initialized');
-    } catch (error) {
-      console.error('❌ Failed to initialize automated swap service:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Process detected deposit and trigger automated swap
-   */
-  async processDeposit(depositEvent: DepositEvent): Promise<void> {
-    try {
-      console.log(`🔍 Processing deposit for exchange ${depositEvent.exchangeId}`);
-
-      // Get exchange details from database
-      const exchange = await ExchangeHistory.findOne({ 
-        exchangeId: depositEvent.exchangeId 
-      });
-
+      const exchange = await ExchangeHistory.findOne({ exchangeId });
+      
       if (!exchange) {
-        throw new Error(`Exchange not found: ${depositEvent.exchangeId}`);
+        logger.error(`Exchange ${exchangeId} not found`);
+        return;
       }
 
-      // Update exchange status to processing
-      await this.updateExchangeStatus(exchange._id, 'processing', {
-        depositReceived: true,
-        depositAmount: parseFloat(depositEvent.amount),
-        depositTxId: depositEvent.txHash
-      });
-
-      // Simulate swap processing (replace with actual Rubic integration later)
-      setTimeout(async () => {
-        await this.updateExchangeStatus(exchange._id, 'completed', {
-          swapCompleted: true,
-          withdrawalTxId: 'mock_tx_' + Date.now()
-        });
-        console.log(`✅ Mock swap completed for ${depositEvent.exchangeId}`);
-      }, 5000);
-
-    } catch (error) {
-      console.error(`❌ Error processing deposit for ${depositEvent.exchangeId}:`, error);
-      await this.handleSwapError(depositEvent.exchangeId, error);
-    }
-  }
-
-  /**
-   * Update exchange status in database
-   */
-  private async updateExchangeStatus(
-    exchangeId: string, 
-    status: string, 
-    updates: Partial<IExchangeHistory>
-  ): Promise<void> {
-    await ExchangeHistory.findOneAndUpdate(
-      { exchangeId },
-      { 
-        status,
-        ...updates,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
-
-    console.log(`📝 Exchange ${exchangeId} status updated to: ${status}`);
-  }
-
-  /**
-   * Execute real swap using Rubic SDK with private keys
-   */
-  private async executeRubicSwap(depositEvent: DepositEvent, exchange: IExchangeHistory): Promise<void> {
-    const fromCurrency = depositEvent.token.toUpperCase() as SupportedCurrency;
-    
-    // Get private key for the source currency
-    const privateKey = getValidatedPrivateKey(fromCurrency);
-    if (!privateKey) {
-      throw new Error(`No private key configured for ${fromCurrency}. Add ${fromCurrency}_PRIVATE_KEY to .env file`);
-    }
-
-    logger.info(`🔐 Using private key for ${fromCurrency} automated swap`);
-    logger.info(`💱 Executing swap: ${depositEvent.amount} ${fromCurrency} → ${exchange.to.currency}`);
-
-    // TODO: Implement actual Rubic SDK integration
-    // This is where you'll integrate with Rubic SDK using the private key
-    
-    try {
-      // Placeholder for Rubic SDK integration
-      logger.info(`🚀 Starting Rubic swap execution...`);
-      
-      // Example Rubic integration structure:
-      /*
-      const rubicSDK = new RubicSDK({
-        privateKey: privateKey,
-        rpcEndpoint: getRpcEndpoint(fromCurrency)
-      });
-      
-      const swapParams = {
-        fromToken: fromCurrency,
-        toToken: exchange.to.currency,
-        amount: depositEvent.amount,
-        fromAddress: depositEvent.fromAddress,
-        toAddress: exchange.walletAddress
+      const queueItem: SwapQueueItem = {
+        exchangeId,
+        fromCurrency: exchange.from.currency,
+        toCurrency: exchange.to.currency,
+        amount: exchange.from.amount,
+        recipientAddress: exchange.walletAddress || '',
+        priority: 1,
+        addedAt: new Date()
       };
-      
-      const swapResult = await rubicSDK.executeSwap(swapParams);
-      */
-      
-      // For now, simulate the swap
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      logger.info(`✅ Rubic swap completed for ${depositEvent.exchangeId}`);
-      
-      return Promise.resolve();
-      
-    } catch (swapError: any) {
-      logger.error(`❌ Rubic swap failed for ${depositEvent.exchangeId}:`, swapError.message);
-      throw swapError;
+
+      this.swapQueue.push(queueItem);
+      logger.info(`✅ Added exchange ${exchangeId} to swap queue`);
+
+      // Start processing if not already running
+      if (!this.isProcessing) {
+        this.startProcessing();
+      }
+    } catch (error: any) {
+      logger.error(`Failed to add exchange to queue: ${error.message}`);
     }
   }
 
   /**
-   * Handle swap errors
+   * Start processing swap queue
    */
-  private async handleSwapError(exchangeId: string, error: any): Promise<void> {
+  private startProcessing(): void {
+    if (this.processingInterval) return;
+
+    this.isProcessing = true;
+    logger.info('🚀 Starting swap queue processing');
+
+    this.processingInterval = setInterval(async () => {
+      await this.processNextSwap();
+    }, 10000); // Process every 10 seconds
+
+    // Process immediately
+    this.processNextSwap();
+  }
+
+  /**
+   * Process next swap in queue
+   */
+  private async processNextSwap(): Promise<void> {
+    if (this.swapQueue.length === 0) {
+      return;
+    }
+
+    const swap = this.swapQueue.shift();
+    if (!swap) return;
+
     try {
-      await this.updateExchangeStatus(exchangeId, 'failed', {
-        swapCompleted: false
-      });
+      logger.info(`🔄 Processing swap for ${swap.exchangeId}`);
+      logger.info(`   ${swap.amount} ${swap.fromCurrency} → ${swap.toCurrency}`);
 
-      // Remove from processing
-      this.swapQueue.delete(exchangeId);
-      this.processingSwaps.delete(exchangeId);
+      // Update status to processing
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId: swap.exchangeId },
+        {
+          status: 'processing',
+          notes: 'Swap in progress - manual processing required'
+        }
+      );
 
-      console.error(`💥 Swap error handled for ${exchangeId}`);
-    } catch (updateError) {
-      console.error('❌ Error updating failed swap status:', updateError);
+      // Mark for manual review (no automatic swap execution)
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId: swap.exchangeId },
+        {
+          status: 'in_review',
+          notes: 'Ready for manual swap execution by admin'
+        }
+      );
+
+      logger.info(`✅ Exchange ${swap.exchangeId} marked for manual processing`);
+    } catch (error: any) {
+      logger.error(`❌ Failed to process ${swap.exchangeId}: ${error.message}`);
+
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId: swap.exchangeId },
+        {
+          status: 'failed',
+          errorMessage: error.message,
+          notes: 'Processing failed - admin intervention required'
+        }
+      );
     }
   }
 
   /**
-   * Get current swap queue status
+   * Stop processing
    */
-  getSwapQueueStatus(): {
-    queueSize: number;
-    processing: number;
-    isInitialized: boolean;
-  } {
+  stop(): void {
+    if (this.processingInterval) {
+      clearInterval(this.processingInterval);
+      this.processingInterval = null;
+      this.isProcessing = false;
+      logger.info('🛑 Swap processing stopped');
+    }
+  }
+
+  /**
+   * Get queue status
+   */
+  getSwapQueueStatus() {
     return {
-      queueSize: this.swapQueue.size,
-      processing: this.processingSwaps.size,
-      isInitialized: this.isInitialized
+      queueSize: this.swapQueue.length,
+      isProcessing: this.isProcessing,
+      pendingSwaps: this.swapQueue.map(s => ({
+        exchangeId: s.exchangeId,
+        fromCurrency: s.fromCurrency,
+        toCurrency: s.toCurrency,
+        amount: s.amount
+      }))
     };
   }
 
   /**
-   * Manual swap execution (for testing/admin)
+   * Manual swap trigger (for admin)
    */
-  async executeManualSwap(exchangeId: string): Promise<void> {
-    console.log(`🔧 Manual swap execution triggered for ${exchangeId}`);
-    // Simulate manual swap processing
-    const exchange = await ExchangeHistory.findOne({ exchangeId });
-    if (exchange) {
-      await this.updateExchangeStatus(exchangeId, 'completed', {
-        swapCompleted: true,
-        withdrawalTxId: 'manual_tx_' + Date.now()
-      });
-    }
+  async triggerManualSwap(exchangeId: string): Promise<void> {
+    logger.info(`🔧 Manual swap triggered for ${exchangeId}`);
+    await this.addToQueue(exchangeId);
   }
 }
 
-// Singleton instance
 export const automatedSwapService = new AutomatedSwapService();
-
+export default automatedSwapService;

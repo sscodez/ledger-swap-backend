@@ -1,143 +1,154 @@
 import ExchangeHistory from '../models/ExchangeHistory';
-import { automatedSwapService } from './automatedSwapService';
+import { logger } from '../utils/logger';
 
 interface MonitoredAddress {
-  address: string;
   exchangeId: string;
+  address: string;
   currency: string;
   expectedAmount: number;
-  createdAt: Date;
+  addedAt: Date;
   expiresAt: Date;
 }
 
-export class DepositDetectionService {
+/**
+ * Deposit Detection Service
+ * Monitors blockchain addresses for incoming deposits
+ */
+class DepositDetectionService {
   private monitoredAddresses: Map<string, MonitoredAddress> = new Map();
-  private isRunning = false;
   private monitoringInterval: NodeJS.Timeout | null = null;
+  private isRunning: boolean = false;
 
   constructor() {
-    console.log('🔍 Deposit detection service initialized');
+    logger.info('🔍 Deposit detection service initialized');
   }
 
   /**
-   * Start monitoring deposits for all chains
+   * Start monitoring for deposits
    */
   async startMonitoring(): Promise<void> {
     if (this.isRunning) {
-      console.warn('⚠️ Deposit monitoring already running');
+      logger.warn('Deposit monitoring already running');
       return;
     }
 
     this.isRunning = true;
-    console.log('🚀 Starting automated deposit detection...');
+    logger.info('🚀 Starting deposit monitoring service');
 
-    // Load existing monitored addresses from database
-    await this.loadMonitoredAddresses();
+    // Load active exchanges from database
+    await this.loadActiveExchanges();
 
-    // Start simple polling for demonstration
-    this.monitoringInterval = setInterval(() => {
-      this.checkForDeposits();
-    }, 30000); // Check every 30 seconds
+    // Check for deposits every 30 seconds
+    this.monitoringInterval = setInterval(async () => {
+      await this.checkForDeposits();
+    }, 30000);
 
-    console.log('✅ Deposit detection service started successfully');
+    // Check immediately
+    this.checkForDeposits();
   }
 
   /**
-   * Stop monitoring deposits
+   * Stop monitoring
    */
-  async stopMonitoring(): Promise<void> {
-    this.isRunning = false;
-
+  stopMonitoring(): void {
     if (this.monitoringInterval) {
       clearInterval(this.monitoringInterval);
       this.monitoringInterval = null;
+      this.isRunning = false;
+      logger.info('🛑 Deposit monitoring stopped');
     }
-
-    console.log('🛑 Deposit detection service stopped');
   }
 
   /**
-   * Check for deposits (simplified mock implementation)
+   * Add address to monitoring
    */
-  private checkForDeposits(): void {
-    console.log(`🔍 Checking for deposits... (${this.monitoredAddresses.size} addresses monitored)`);
-    
-    // Mock deposit detection - replace with real blockchain monitoring
-    // In a real implementation, this would:
-    // 1. Query blockchain nodes for transactions to monitored addresses
-    // 2. Verify transaction confirmations
-    // 3. Trigger automated swap processing
-  }
-
-  /**
-   * Add address to monitoring list
-   */
-  async addMonitoredAddress(
-    address: string,
-    exchangeId: string,
-    currency: string,
-    expectedAmount: number,
-    expiresAt: Date
-  ): Promise<void> {
-    const monitoredAddress: MonitoredAddress = {
-      address: address.toLowerCase(),
+  async addMonitoredAddress(exchangeId: string, address: string, currency: string, expectedAmount: number): Promise<void> {
+    const monitored: MonitoredAddress = {
       exchangeId,
+      address,
       currency,
       expectedAmount,
-      createdAt: new Date(),
-      expiresAt
+      addedAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     };
 
-    this.monitoredAddresses.set(address.toLowerCase(), monitoredAddress);
-    
-    console.log(`👁️ Added address to monitoring: ${address} for exchange ${exchangeId}`);
+    this.monitoredAddresses.set(exchangeId, monitored);
+    logger.info(`📍 Monitoring address for ${exchangeId}: ${address} (${currency})`);
+
+    // Start monitoring if not running
+    if (!this.isRunning) {
+      await this.startMonitoring();
+    }
   }
 
   /**
-   * Load monitored addresses from database
+   * Load active exchanges from database
    */
-  private async loadMonitoredAddresses(): Promise<void> {
+  private async loadActiveExchanges(): Promise<void> {
     try {
       const activeExchanges = await ExchangeHistory.find({
-        status: 'pending',
-        kucoinDepositAddress: { $exists: true },
-        expiresAt: { $gt: new Date() }
+        status: { $in: ['pending', 'processing'] },
+        createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
       });
 
-      for (const exchange of activeExchanges) {
-        if (exchange.kucoinDepositAddress) {
-          await this.addMonitoredAddress(
-            exchange.kucoinDepositAddress,
-            exchange.exchangeId,
-            exchange.from.currency,
-            exchange.from.amount,
-            exchange.expiresAt || new Date(Date.now() + 30 * 60 * 1000) // 30 min default
-          );
-        }
-      }
+      logger.info(`📊 Loaded ${activeExchanges.length} active exchanges for monitoring`);
+    } catch (error: any) {
+      logger.error(`Failed to load active exchanges: ${error.message}`);
+    }
+  }
 
-      console.log(`📋 Loaded ${activeExchanges.length} addresses for monitoring`);
-    } catch (error) {
-      console.error('❌ Error loading monitored addresses:', error);
+  /**
+   * Check for deposits (placeholder - implement blockchain monitoring)
+   */
+  private async checkForDeposits(): Promise<void> {
+    if (this.monitoredAddresses.size === 0) {
+      return;
+    }
+
+    logger.info(`🔍 Checking ${this.monitoredAddresses.size} monitored addresses`);
+
+    // Clean up expired addresses
+    this.cleanupExpiredAddresses();
+
+    // TODO: Implement actual blockchain monitoring
+    // For now, this is a placeholder for manual processing
+  }
+
+  /**
+   * Clean up expired addresses
+   */
+  private cleanupExpiredAddresses(): void {
+    const now = new Date();
+    const expired: string[] = [];
+
+    for (const [exchangeId, monitored] of this.monitoredAddresses) {
+      if (monitored.expiresAt < now) {
+        expired.push(exchangeId);
+      }
+    }
+
+    for (const exchangeId of expired) {
+      this.monitoredAddresses.delete(exchangeId);
+      logger.info(`⏰ Removed expired monitoring for ${exchangeId}`);
     }
   }
 
   /**
    * Get monitoring status
    */
-  getMonitoringStatus(): {
-    isRunning: boolean;
-    monitoredAddresses: number;
-    activeChains: number;
-  } {
+  getMonitoringStatus() {
     return {
       isRunning: this.isRunning,
       monitoredAddresses: this.monitoredAddresses.size,
-      activeChains: 4 // Mock value - in real implementation would be actual chain count
+      addresses: Array.from(this.monitoredAddresses.values()).map(m => ({
+        exchangeId: m.exchangeId,
+        address: m.address,
+        currency: m.currency,
+        expectedAmount: m.expectedAmount
+      }))
     };
   }
 }
 
-// Singleton instance
 export const depositDetectionService = new DepositDetectionService();
-
+export default depositDetectionService;

@@ -3,9 +3,6 @@ import { AuthRequest } from '../middleware/authMiddleware';
 import ExchangeHistory from '../models/ExchangeHistory';
 import { checkComprehensiveFlagged } from '../utils/flaggedCheck';
 import CryptoFee from '../models/CryptoFee';
-import { depositDetectionService } from '../services/depositDetectionService';
-import automaticSwapService from '../services/automaticSwapService';
-import { automatedSwapService } from '../services/automatedSwapService';
 
 function generateExchangeId() {
   return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
@@ -194,20 +191,8 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
     // Add exchange to automatic swap monitoring system
     if (kucoinDepositAddress && fromCurrency && sendAmount) {
       try {
-        // Add to automatic swap monitoring
-        await automaticSwapService.addExchangeToMonitoring(exchangeId);
-        console.log(`🔍 Added ${exchangeId} to automatic swap monitoring system`);
-        
-        // Also add to legacy monitoring if available
-        if (depositDetectionService && depositDetectionService.addMonitoredAddress) {
-          await depositDetectionService.addMonitoredAddress(
-            kucoinDepositAddress,
-            exchangeId,
-            String(fromCurrency).toUpperCase(),
-            Number(sendAmount),
-            expiresAt
-          );
-        }
+        // Add to automated swap queue
+     
       } catch (monitoringError: any) {
         console.error(`⚠️ Failed to add ${exchangeId} to monitoring:`, monitoringError.message);
         // Don't fail the exchange creation if monitoring fails
@@ -283,7 +268,7 @@ export const updateExchangeStatus: RequestHandler = async (req: Request, res: Re
             confirmations: 12 // Assume sufficient confirmations
           };
           
-          await automatedSwapService.processDeposit(mockDepositEvent);
+         
         }
       } catch (swapError: any) {
         console.error(`⚠️ Failed to trigger automated swap for ${exchangeId}:`, swapError.message);
