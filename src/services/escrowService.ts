@@ -1,12 +1,11 @@
 import { BitcoinEscrow } from "../chains/bitcoin";
-import { EthereumEscrow } from "../chains/xdc";
 import { StellarEscrow } from "../chains/stellar";
 import { XrplEscrow } from "../chains/xrpl";
 
 const CHAINS: Record<string, any> = {
-  // bitcoin: BitcoinEscrow,
-  // stellar: StellarEscrow,
-  // xrpl: XrplEscrow
+  bitcoin: BitcoinEscrow,
+  stellar: StellarEscrow,
+  xrpl: XrplEscrow
 };
 
 export class EscrowService {
