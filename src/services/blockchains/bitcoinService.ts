@@ -55,6 +55,96 @@ class BitcoinService {
   }
 
   /**
+   * Build an unsigned PSBT for a payment from fromAddress to toAddress.
+   * Returns base64 PSBT and metadata for the client to sign and submit back.
+   */
+  async buildUnsignedPsbt(
+    fromAddress: string,
+    toAddress: string,
+    amountBTC: number,
+    feeRate: number = 10
+  ): Promise<{ psbtBase64: string; inputs: number; changeSat: number; network: 'mainnet' | 'testnet' }> {
+    try {
+      const utxos = await this.getUTXOs(fromAddress);
+      if (!utxos.length) throw new Error('No UTXOs available for spending');
+
+      const satoshiAmount = Math.floor(amountBTC * 1e8);
+
+      // Select UTXOs greedily until we cover amount + rough fee
+      const sorted = [...utxos].sort((a, b) => b.value - a.value);
+      const selected: Array<{ txid: string; vout: number; value: number }> = [];
+      let inputSum = 0;
+
+      // Initial rough fee assuming 1 input, 2 outputs
+      const roughSize = (inputs: number, outputs: number) => 10 + inputs * 148 + outputs * 34; // bytes
+      let estFee = Math.ceil(feeRate * roughSize(1, 2));
+
+      for (const utxo of sorted) {
+        selected.push(utxo);
+        inputSum += utxo.value;
+        estFee = Math.ceil(feeRate * roughSize(selected.length, 2));
+        if (inputSum >= satoshiAmount + estFee) break;
+      }
+
+      if (inputSum < satoshiAmount + estFee) {
+        throw new Error('Insufficient balance for amount + fee');
+      }
+
+      const change = inputSum - satoshiAmount - estFee;
+
+      const psbt = new bitcoin.Psbt({ network: this.network });
+
+      // Add inputs with full previous tx (nonWitnessUtxo) for broad compatibility
+      for (const utxo of selected) {
+        const txHex = await this.getRawTransaction(utxo.txid);
+        psbt.addInput({
+          hash: utxo.txid,
+          index: utxo.vout,
+          nonWitnessUtxo: Buffer.from(txHex, 'hex'),
+        });
+      }
+
+      // Output to recipient
+      psbt.addOutput({ address: toAddress, value: satoshiAmount });
+
+      // Change output back to sender if above dust
+      if (change > 546) {
+        psbt.addOutput({ address: fromAddress, value: change });
+      }
+
+      return {
+        psbtBase64: psbt.toBase64(),
+        inputs: selected.length,
+        changeSat: Math.max(change, 0),
+        network: this.network === bitcoin.networks.testnet ? 'testnet' : 'mainnet',
+      };
+    } catch (error: any) {
+      console.error('❌ buildUnsignedPsbt error:', error);
+      throw new Error(error?.message || 'Failed to build PSBT');
+    }
+  }
+
+  /**
+   * Finalize a signed PSBT (from wallet) and broadcast it to the network.
+   */
+  async finalizeAndBroadcastSignedPsbt(signedPsbtBase64: string): Promise<string> {
+    try {
+      const psbt = bitcoin.Psbt.fromBase64(signedPsbtBase64, { network: this.network });
+      try {
+        psbt.finalizeAllInputs();
+      } catch (e) {
+        // If already finalized, ignore
+      }
+      const txHex = psbt.extractTransaction().toHex();
+      const txid = await this.broadcastTransaction(txHex);
+      return txid;
+    } catch (error: any) {
+      console.error('❌ finalizeAndBroadcastSignedPsbt error:', error);
+      throw new Error(error?.message || 'Failed to broadcast PSBT');
+    }
+  }
+
+  /**
    * Generate new Bitcoin address (production-ready)
    * Creates a random keypair and returns P2WPKH (native SegWit) address
    * IMPORTANT: Store privateKeyWIF securely (encrypted in DB or vault)
