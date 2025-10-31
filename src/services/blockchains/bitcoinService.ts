@@ -11,6 +11,10 @@ import * as tinysecp from 'tiny-secp256k1';
 
 const ECPair = ECPairFactory(tinysecp);
 
+// Initialize ECC library for bitcoinjs-lib v6+
+// This is required before using Psbt or other ECC operations
+bitcoin.initEccLib(tinysecp as any);
+
 export interface BitcoinTransaction {
   txid: string;
   from: string[];
