@@ -25,45 +25,32 @@ async function tryConnect(mongoURI: string) {
 }
 
 const connectDB = async () => {
-  const mongoURI = 'mongodb+srv://ssameershah1200:fsuheocdNSHmLZjJ@cluster0.klfmnwd.mongodb.net/ledgerswap';
+  if (process.env.SKIP_DB === '1') {
+    console.warn('SKIP_DB=1 detected. Starting server without DB connection.');
+    return;
+  }
+  // Prefer environment variable; do not hardcode credentials
+  const mongoURI = process.env.MONGO_URI || '';
   if (!mongoURI || mongoURI.trim() === '') {
-    console.error('MONGO_URI not found or empty in .env file');
-    console.error('Please set MONGO_URI in your .env file to a valid MongoDB connection string');
-    console.error('Example: MONGO_URI=mongodb://localhost:27017/ledgerswap');
-    console.error('Or for MongoDB Atlas: MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/ledgerswap');
-    process.exit(1);
+    console.warn('MONGO_URI not set. Starting server without DB connection. Some routes will be limited.');
+    return; // Do not block server startup
   }
 
-  const maxRetries = 5;
-  let attempt = 0;
-  while (attempt < maxRetries) {
-    attempt += 1;
-    try {
-      await tryConnect(mongoURI);
-      console.log('MongoDB connected');
-      return;
-    } catch (error: any) {
-      const code = error?.code || error?.name;
-      const msg = error?.message || String(error);
-      console.error(`MongoDB connection attempt ${attempt} failed (${code}): ${msg}`);
-
-      // Common guidance for SRV/DNS timeouts
-      if (msg?.includes('queryTxt') || msg?.includes('ETIMEOUT')) {
-        console.error(
-          'Hint: If you are using mongodb+srv, ensure network allows DNS (TXT/SRV) lookups and your Atlas IP Access List includes your IP.\n' +
-          '      Alternatively, use a standard mongodb:// connection string with hosts/replicas instead of SRV.'
-        );
-      }
-
-      if (attempt >= maxRetries) {
-        console.error('Exceeded max retries. Exiting.');
-        process.exit(1);
-      }
-
-      // Backoff before next attempt
-      const backoffMs = Math.min(15000, 1000 * attempt);
-      await new Promise((res) => setTimeout(res, backoffMs));
+  try {
+    await tryConnect(mongoURI);
+    console.log('MongoDB connected');
+  } catch (error: any) {
+    const code = error?.code || error?.name;
+    const msg = error?.message || String(error);
+    console.error(`MongoDB connection failed (${code}): ${msg}`);
+    if (msg?.includes('queryTxt') || msg?.includes('ETIMEOUT')) {
+      console.error(
+        'Hint: If you are using mongodb+srv, ensure network allows DNS (TXT/SRV) lookups and your Atlas IP Access List includes your IP.\n' +
+        '      Alternatively, use a standard mongodb:// connection string with hosts/replicas instead of SRV.'
+      );
     }
+    console.warn('Continuing to run without DB. API routes that require DB may fail until DB is reachable.');
+    // Do not throw or exit; allow server to start for non-DB routes
   }
 };
 
