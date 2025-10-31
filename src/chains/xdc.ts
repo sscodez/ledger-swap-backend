@@ -1,61 +1,58 @@
-import { ethers } from "ethers";
-import { EscrowAdapter } from "../types/escrowAdaptar";
 
-// Simple escrow contract ABI for XDC
-const EscrowABI = [
-  "function release() external",
-  "function refund() external"
-];
-const EscrowBytecode = "0x608060405234801561001057600080fd5b50";
+// chains/xdc.ts
+import Web3 from "web3";
+import abi from "./abi/XDCEscrow.json";
 
-// Lazy initialization to prevent crashes when env vars are missing
-let provider: ethers.JsonRpcProvider | null = null;
-let adminWallet: ethers.Wallet | null = null;
+const web3 = new Web3("https://rpc.xinfin.network");
+const contract = new web3.eth.Contract(abi, process.env.XDC_ESCROW_ADDR);
 
-function initializeProvider() {
-  if (!provider && process.env.ETH_RPC && process.env.ADMIN_PK) {
-    provider = new ethers.JsonRpcProvider(process.env.ETH_RPC);
-    adminWallet = new ethers.Wallet(process.env.ADMIN_PK, provider);
-  }
-  return { provider, adminWallet };
+// chains/iota.ts
+
+// Contract Address after deployment
+const ESCROW_ADDR = process.env.IOTA_ESCROW_ADDR;
+
+const contract = new web3.eth.Contract(abi, ESCROW_ADDR);
+
+// --- SELLER LOCKS FUNDS ---
+export async function iotaLockSeller({ escrowId, sellerWallet, privateKey, amount }:any) {
+  const tx = contract.methods.lockSeller(escrowId);
+  const gas = await tx.estimateGas({ from: sellerWallet, value: web3.utils.toWei(amount, "ether") });
+
+  const signed = await web3.eth.accounts.signTransaction({
+    to: ESCROW_ADDR,
+    data: tx.encodeABI(),
+    gas,
+    value: web3.utils.toWei(amount, "ether")
+  }, privateKey);
+
+  return await web3.eth.sendSignedTransaction(signed.rawTransaction);
 }
 
-export const EthereumEscrow: EscrowAdapter = {
-  async create({ seller, buyer, amount }) {
-    const { provider, adminWallet } = initializeProvider();
-    if (!provider || !adminWallet) {
-      throw new Error('XDC escrow not configured - missing ETH_RPC or ADMIN_PK environment variables');
-    }
-    
-    // For XDC, we'll use a simple contract deployment
-    // In production, deploy actual escrow contract
-    const factory = new ethers.ContractFactory(
-      EscrowABI,
-      EscrowBytecode,
-      adminWallet
-    );
-    const contract = await factory.deploy();
-    await contract.waitForDeployment();
-    return await contract.getAddress();
-  },
-  async release({ contractAddr }) {
-    const { adminWallet } = initializeProvider();
-    if (!adminWallet) {
-      throw new Error('XDC escrow not configured - missing ADMIN_PK environment variable');
-    }
-    
-    const contract = new ethers.Contract(contractAddr, EscrowABI, adminWallet);
-    const tx = await contract.release();
-    return await tx.wait();
-  },
-  async refund({ contractAddr }) {
-    const { adminWallet } = initializeProvider();
-    if (!adminWallet) {
-      throw new Error('XDC escrow not configured - missing ADMIN_PK environment variable');
-    }
-    
-    const contract = new ethers.Contract(contractAddr, EscrowABI, adminWallet);
-    const tx = await contract.refund();
-    return await tx.wait();
-  }
-};
+// --- BUYER LOCKS MATCHING FUNDS ---
+export async function iotaLockBuyer({ escrowId, buyerWallet, privateKey, amount }:any) {
+  const tx = contract.methods.lockBuyer(escrowId);
+  const gas = await tx.estimateGas({ from: buyerWallet, value: web3.utils.toWei(amount, "ether") });
+
+  const signed = await web3.eth.accounts.signTransaction({
+    to: ESCROW_ADDR,
+    data: tx.encodeABI(),
+    gas,
+    value: web3.utils.toWei(amount, "ether")
+  }, privateKey);
+
+  return await web3.eth.sendSignedTransaction(signed.rawTransaction);
+}
+
+// --- RELEASE ESCROW ---
+export async function iotaRelease({ escrowId, wallet, privateKey }:any) {
+  const tx = contract.methods.release(escrowId);
+  const gas = await tx.estimateGas({ from: wallet });
+
+  const signed = await web3.eth.accounts.signTransaction({
+    to: ESCROW_ADDR,
+    data: tx.encodeABI(),
+    gas
+  }, privateKey);
+
+  return await web3.eth.sendSignedTransaction(signed.rawTransaction);
+}

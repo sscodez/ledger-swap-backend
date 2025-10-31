@@ -126,7 +126,7 @@ app.use('/api/flagged-check', flaggedCheckRoutes);
 app.use('/api/chains', chainRoutes);
 app.use('/api/tokens', tokenRoutes);
 // app.use('/api/xumm', xummRoutes);
-app.use('/api/escrow', escrowRoutes);
+// app.use('/api/escrow', escrowRoutes);
 
 async function start() {
   try {
