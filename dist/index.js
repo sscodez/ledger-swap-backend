@@ -38,7 +38,7 @@ const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
 const flaggedCheckRoutes_1 = __importDefault(require("./routes/flaggedCheckRoutes"));
 const chainRoutes_1 = __importDefault(require("./routes/chainRoutes"));
 const tokenRoutes_1 = __importDefault(require("./routes/tokenRoutes"));
-const escrowRoutes_1 = __importDefault(require("./routes/escrowRoutes"));
+// import escrowRoutes from './routes/escrowRoutes';
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -129,7 +129,7 @@ app.use('/api/flagged-check', flaggedCheckRoutes_1.default);
 app.use('/api/chains', chainRoutes_1.default);
 app.use('/api/tokens', tokenRoutes_1.default);
 // app.use('/api/xumm', xummRoutes);
-app.use('/api/escrow', escrowRoutes_1.default);
+// app.use('/api/escrow', escrowRoutes);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

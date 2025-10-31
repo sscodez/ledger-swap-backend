@@ -1,25 +1,26 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.EscrowService = void 0;
-const bitcoin_1 = require("../chains/bitcoin");
-const stellar_1 = require("../chains/stellar");
-const xrpl_1 = require("../chains/xrpl");
-const CHAINS = {
-    bitcoin: bitcoin_1.BitcoinEscrow,
-    stellar: stellar_1.StellarEscrow,
-    xrpl: xrpl_1.XrplEscrow
-};
-class EscrowService {
-    static create(chain, params) {
-        return CHAINS[chain].create(params);
-    }
-    static release(chain, params) {
-        return CHAINS[chain].release(params);
-    }
-    static refund(chain, params) {
-        if (!CHAINS[chain].refund)
-            throw new Error("Refund not supported on this chain");
-        return CHAINS[chain].refund(params);
-    }
-}
-exports.EscrowService = EscrowService;
+// // escrows.ts (Shared Cross-Chain Manager)
+// import { xrplLock, xrplRelease } from "../chains/xrp";
+// import { xdcLock, xdcRelease } from "../chains/xdc";
+// import { btcLock, btcRelease } from "../chains/btc";
+// import { iotaLock, iotaRelease } from "../chains/iota";
+// import { xlmLock, xlmRelease } from "../chains/xlm";
+// const chainHandlers = {
+//   xrp: { lock: xrplLock, release: xrplRelease },
+//   xdc: { lock: xdcLock, release: xdcRelease },
+//   btc: { lock: btcLock, release: btcRelease },
+//   iota: { lock: iotaLock, release: iotaRelease },
+//   xlm: { lock: xlmLock, release: xlmRelease }
+// };
+// export async function lockEscrow(chain: string, params: any) {
+//   return await chainHandlers[chain].lock(params);
+// }
+// export async function releaseEscrow(chain: string, params: any) {
+//   return await chainHandlers[chain].release(params);
+// }
+// export async function attemptMutualRelease(escrowRecord: any) {
+//   if (escrowRecord.seller_locked && escrowRecord.buyer_locked) {
+//     await releaseEscrow(escrowRecord.seller_chain, escrowRecord);
+//     await releaseEscrow(escrowRecord.buyer_chain, escrowRecord);
+//   }
+// }

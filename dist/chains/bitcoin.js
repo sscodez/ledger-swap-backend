@@ -1,30 +1,28 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BitcoinEscrow = void 0;
-const bitcoin_1 = require("../smart-layers/bitcoin");
-exports.BitcoinEscrow = {
-    create() {
-        return __awaiter(this, void 0, void 0, function* () {
-            return (0, bitcoin_1.createBitcoinEscrow)();
-        });
-    },
-    release(_a) {
-        return __awaiter(this, arguments, void 0, function* ({ psbt, keys, redeem, inputIndex }) {
-            return (0, bitcoin_1.releaseBitcoinEscrow)(psbt, inputIndex, keys, redeem);
-        });
-    },
-    refund(_a) {
-        return __awaiter(this, arguments, void 0, function* ({ psbt, keys, redeem, inputIndex }) {
-            return (0, bitcoin_1.releaseBitcoinEscrow)(psbt, inputIndex, keys, redeem);
-        });
-    }
-};
+// // chains/btc.ts
+// import * as bitcoin from "bitcoinjs-lib";
+// import * as ecc from "tiny-secp256k1";
+// bitcoin.initEccLib(ecc);
+// export function btcLock({ sellerPubKey, buyerPubKey, amountSats, lockTime }:any) {
+//   const redeemScript = bitcoin.script.fromASM(`
+//       OP_IF
+//           ${buyerPubKey.toString("hex")} OP_CHECKSIG
+//       OP_ELSE
+//           ${lockTime} OP_CHECKLOCKTIMEVERIFY OP_DROP
+//           ${sellerPubKey.toString("hex")} OP_CHECKSIG
+//       OP_ENDIF
+//   `);
+//   const p2sh = bitcoin.payments.p2sh({
+//     redeem: { output: redeemScript }
+//   });
+//   return {
+//     address: p2sh.address,
+//     redeemScript: redeemScript.toString("hex")
+//   };
+// }
+// export function btcRelease({ psbtBase64, signer }:any) {
+//   let psbt = bitcoin.Psbt.fromBase64(psbtBase64);
+//   psbt.signAllInputs(signer);
+//   psbt.finalizeAllInputs();
+//   return psbt.extractTransaction().toHex();
+// }
