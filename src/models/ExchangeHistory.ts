@@ -41,6 +41,8 @@ export interface IExchangeHistory extends Document {
   notes?: string; // Additional notes
   expiresAt?: Date; // When this exchange expires (5 minutes from creation)
   monitoringActive?: boolean; // Whether this exchange is being monitored
+  connectedWallet?: string; // Connected wallet address for anonymous exchanges
+  prefundTxHash?: string; // Transaction hash of prefund transaction
   createdAt: Date; // Added by timestamps: true
   updatedAt: Date; // Added by timestamps: true
 }
@@ -188,6 +190,14 @@ const exchangeHistorySchema: Schema = new Schema({
     type: Boolean,
     default: true,
     index: true, // Index for filtering active monitoring
+  },
+  connectedWallet: {
+    type: String,
+    index: true, // Index for filtering by connected wallet
+  },
+  prefundTxHash: {
+    type: String,
+    index: true, // Index for filtering by transaction hash
   },
 }, {
   timestamps: true,

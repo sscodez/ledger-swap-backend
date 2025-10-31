@@ -292,3 +292,123 @@ export const updateExchangeStatus: RequestHandler = async (req: Request, res: Re
     return res.status(500).json({ message: 'Failed to update status', error: err?.message || String(err) });
   }
 };
+
+// GET /api/exchanges/public
+// Get all public exchanges with optional filtering
+export const getPublicExchanges: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    const { sendCurrency, receiveCurrency, status } = req.query;
+    
+    // Build filter object
+    const filter: any = {};
+    
+    if (sendCurrency) {
+      filter['from.currency'] = sendCurrency;
+    }
+    
+    if (receiveCurrency) {
+      filter['to.currency'] = receiveCurrency;
+    }
+    
+    if (status) {
+      filter.status = status;
+    }
+    
+    // Get exchanges, sorted by creation date (newest first)
+    const exchanges = await ExchangeHistory.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(100) // Limit to prevent large responses
+      .lean();
+    
+    // Transform to match frontend interface
+    const transformedExchanges = exchanges.map(exchange => ({
+      _id: exchange._id,
+      exchangeId: exchange.exchangeId,
+      sendAmount: exchange.from.amount,
+      sendCurrency: exchange.from.currency,
+      receiveCurrency: exchange.to.currency,
+      receiveAmount: exchange.to.amount,
+      walletAddress: exchange.walletAddress,
+      status: exchange.status || 'pending',
+      createdAt: exchange.createdAt,
+      isAnonymous: exchange.isAnonymous || false,
+      connectedWallet: exchange.connectedWallet,
+      prefundTxHash: exchange.prefundTxHash
+    }));
+    
+    return res.json({
+      success: true,
+      exchanges: transformedExchanges,
+      count: transformedExchanges.length
+    });
+  } catch (err: any) {
+    console.error('Error fetching public exchanges:', err);
+    return res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch exchanges', 
+      error: err?.message || String(err) 
+    });
+  }
+};
+
+// POST /api/exchanges/:exchangeId/complete
+// Mark an exchange as completed with transaction hash
+export const completeExchange: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    const { exchangeId } = req.params;
+    const { prefundTxHash, connectedWallet, status = 'completed' } = req.body;
+    
+    if (!prefundTxHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Transaction hash is required'
+      });
+    }
+    
+    // Find and update the exchange
+    const exchange = await ExchangeHistory.findOne({ exchangeId });
+    
+    if (!exchange) {
+      return res.status(404).json({
+        success: false,
+        message: 'Exchange not found'
+      });
+    }
+    
+    // Check if already completed
+    if (exchange.status === 'completed' || exchange.prefundTxHash) {
+      return res.status(400).json({
+        success: false,
+        message: 'Exchange is already completed'
+      });
+    }
+    
+    // Update the exchange
+    exchange.prefundTxHash = prefundTxHash;
+    exchange.status = status;
+    if (connectedWallet) {
+      exchange.connectedWallet = connectedWallet;
+    }
+    exchange.updatedAt = new Date();
+    
+    await exchange.save();
+    
+    return res.json({
+      success: true,
+      message: 'Exchange completed successfully',
+      exchange: {
+        exchangeId: exchange.exchangeId,
+        status: exchange.status,
+        prefundTxHash: exchange.prefundTxHash,
+        updatedAt: exchange.updatedAt
+      }
+    });
+  } catch (err: any) {
+    console.error('Error completing exchange:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to complete exchange',
+      error: err?.message || String(err)
+    });
+  }
+};
