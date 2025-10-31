@@ -24,8 +24,6 @@ import contactRoutes from './routes/contactRoutes';
 import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
 import chainRoutes from './routes/chainRoutes';
 import tokenRoutes from './routes/tokenRoutes';
-// import bitcoinRoutes from './routes/bitcoinRoutes';
-// import escrowRoutes from './routes/escrowRoutes';
 
 dotenv.config();
 const app = express();
@@ -126,9 +124,6 @@ app.use('/api/contacts', contactRoutes);
 app.use('/api/flagged-check', flaggedCheckRoutes);
 app.use('/api/chains', chainRoutes);
 app.use('/api/tokens', tokenRoutes);
-// app.use('/api/bitcoin', bitcoinRoutes);
-// app.use('/api/xumm', xummRoutes);
-// app.use('/api/escrow', escrowRoutes);
 
 async function start() {
   try {
