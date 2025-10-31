@@ -24,7 +24,7 @@ import contactRoutes from './routes/contactRoutes';
 import flaggedCheckRoutes from './routes/flaggedCheckRoutes';
 import chainRoutes from './routes/chainRoutes';
 import tokenRoutes from './routes/tokenRoutes';
-import escrowRoutes from './routes/escrowRoutes';
+// import escrowRoutes from './routes/escrowRoutes';
 
 dotenv.config();
 const app = express();
