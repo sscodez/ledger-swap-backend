@@ -88,7 +88,7 @@ export const createExchange: RequestHandler = async (req: Request, res: Response
   }
 
   const exchangeId = generateExchangeId();
-  const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
+  const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
   const computedStatus = allowedStatuses.has(String(status)) ? (String(status) as any) : 'pending';
 
   try {
@@ -230,8 +230,8 @@ export const getExchangeById: RequestHandler = async (req: Request, res: Respons
 export const updateExchangeStatus: RequestHandler = async (req: Request, res: Response) => {
   try {
     const { exchangeId } = req.params as { exchangeId: string };
-    const { status, kucoinOrderId, depositTxId, withdrawalTxId, depositAmount } = req.body;
-    const allowed = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
+    const { status, kucoinOrderId, depositTxId, withdrawalTxId, depositAmount, prefundTxHash } = req.body;
+    const allowed = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
     if (!status || !allowed.has(String(status))) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -243,9 +243,10 @@ export const updateExchangeStatus: RequestHandler = async (req: Request, res: Re
     if (depositTxId) updateData.depositTxId = depositTxId;
     if (withdrawalTxId) updateData.withdrawalTxId = withdrawalTxId;
     if (depositAmount !== undefined) updateData.depositAmount = Number(depositAmount);
+    if (prefundTxHash) updateData.prefundTxHash = prefundTxHash;
     
     // Update monitoring and completion flags based on status
-    if (status === 'processing') {
+    if (status === 'processing' || status === 'confirming' || status === 'exchanging' || status === 'sending') {
       updateData.depositReceived = true;
       
       // 🤖 AUTOMATED SWAP INTEGRATION
@@ -294,10 +295,10 @@ export const updateExchangeStatus: RequestHandler = async (req: Request, res: Re
 };
 
 // GET /api/exchanges/public
-// Get all public exchanges with optional filtering
+// Get all public exchanges with optional filtering and pagination
 export const getPublicExchanges: RequestHandler = async (req: Request, res: Response) => {
   try {
-    const { sendCurrency, receiveCurrency, status } = req.query;
+    const { sendCurrency, receiveCurrency, status, page = '1', limit = '10' } = req.query;
     
     // Build filter object
     const filter: any = {};
@@ -314,10 +315,19 @@ export const getPublicExchanges: RequestHandler = async (req: Request, res: Resp
       filter.status = status;
     }
     
+    // Pagination
+    const pageNum = parseInt(page as string, 10);
+    const limitNum = parseInt(limit as string, 10);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Get total count for pagination
+    const totalCount = await ExchangeHistory.countDocuments(filter);
+    
     // Get exchanges, sorted by creation date (newest first)
     const exchanges = await ExchangeHistory.find(filter)
       .sort({ createdAt: -1 })
-      .limit(100) // Limit to prevent large responses
+      .skip(skip)
+      .limit(limitNum)
       .lean();
     
     // Transform to match frontend interface
@@ -339,7 +349,12 @@ export const getPublicExchanges: RequestHandler = async (req: Request, res: Resp
     return res.json({
       success: true,
       exchanges: transformedExchanges,
-      count: transformedExchanges.length
+      count: transformedExchanges.length,
+      totalCount: totalCount,
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalCount / limitNum),
+      hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+      hasPrevPage: pageNum > 1
     });
   } catch (err: any) {
     console.error('Error fetching public exchanges:', err);
