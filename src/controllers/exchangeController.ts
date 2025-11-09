@@ -438,3 +438,170 @@ export const completeExchange: RequestHandler = async (req: Request, res: Respon
     });
   }
 };
+
+// POST /api/exchanges/:exchangeId/verify-transactions
+// Verify buyer and seller transactions for an exchange
+export const verifyExchangeTransactions: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    const { exchangeId } = req.params;
+    const { buyerTxHash, sellerTxHash } = req.body;
+
+    if (!exchangeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Exchange ID is required'
+      });
+    }
+
+    const exchange = await ExchangeHistory.findOne({ exchangeId });
+
+    if (!exchange) {
+      return res.status(404).json({
+        success: false,
+        message: 'Exchange not found'
+      });
+    }
+
+    const buyerTx = buyerTxHash || exchange.buyerTxhash || exchange.prefundTxHash;
+    const sellerTx = sellerTxHash || exchange.sellerTxhash;
+
+    if (!buyerTx || !sellerTx) {
+      return res.status(400).json({
+        success: false,
+        message: 'Both buyer and seller transaction hashes are required'
+      });
+    }
+
+    // Get admin wallet addresses
+    const ADMIN_WALLETS: Record<string, string> = {
+      XRP: process.env.ADMIN_XRP_ADDRESS || 'rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY',
+      BTC: process.env.ADMIN_BTC_ADDRESS || 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx',
+      XDC: process.env.ADMIN_XDC_ADDRESS || 'xdc50a231ac1c605f271a2f7e9b40a466bba07d2b87',
+      IOTA: process.env.ADMIN_IOTA_ADDRESS || '0x223f679b3d44f25cd0d9b07428217bb68928f05808e5f567b5754f247f45360d',
+      XLM: process.env.ADMIN_XLM_ADDRESS || 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+    };
+
+    const buyerCurrency = String(exchange.from.currency).toUpperCase();
+    const sellerCurrency = String(exchange.to.currency).toUpperCase();
+
+    const adminBuyerWallet = ADMIN_WALLETS[buyerCurrency];
+    const adminSellerWallet = ADMIN_WALLETS[sellerCurrency];
+
+    if (!adminBuyerWallet || !adminSellerWallet) {
+      return res.status(400).json({
+        success: false,
+        message: 'Admin wallet addresses not configured for verification'
+      });
+    }
+
+    // Verify transactions (basic format validation for now)
+    const verifyTransaction = (txHash: string, currency: string, expectedRecipient: string) => {
+      const upperCurrency = currency.toUpperCase();
+
+      // Basic transaction hash format validation
+      if (!txHash || txHash.length < 10) {
+        return { success: false, details: { error: 'Invalid transaction hash format' } };
+      }
+
+      // Currency-specific validation
+      switch (upperCurrency) {
+        case 'BTC':
+        case 'BITCOIN':
+          if (!/^[a-fA-F0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid Bitcoin transaction hash format' } };
+          }
+          break;
+        case 'ETH':
+        case 'USDT':
+        case 'USDC':
+          if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid Ethereum transaction hash format' } };
+          }
+          break;
+        case 'XRP':
+          if (!/^[A-F0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid XRP transaction hash format' } };
+          }
+          break;
+        case 'XLM':
+        case 'STELLAR':
+          if (!/^[a-fA-F0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid Stellar transaction hash format' } };
+          }
+          break;
+        case 'IOTA':
+        case 'MIOTA':
+          if (!/^[A-Z0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid IOTA transaction hash format' } };
+          }
+          break;
+        case 'XDC':
+          if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+            return { success: false, details: { error: 'Invalid XDC transaction hash format' } };
+          }
+          break;
+        default:
+          if (txHash.length < 10) {
+            return { success: false, details: { error: 'Transaction hash too short' } };
+          }
+      }
+
+      // TODO: In production, integrate with blockchain APIs to verify:
+      // 1. Transaction exists
+      // 2. Transaction was sent TO the expected recipient (admin wallet)
+      // 3. Transaction amount matches expected amount
+      // 4. Transaction is confirmed
+
+      return {
+        success: true,
+        details: {
+          txHash,
+          currency: upperCurrency,
+          expectedRecipient,
+          verifiedAt: new Date().toISOString(),
+          status: 'verified',
+          note: 'Basic format validation passed - full blockchain verification needed in production'
+        }
+      };
+    };
+
+    const buyerVerification = verifyTransaction(buyerTx, buyerCurrency, adminBuyerWallet);
+    const sellerVerification = verifyTransaction(sellerTx, sellerCurrency, adminSellerWallet);
+
+    const result = {
+      buyerVerified: buyerVerification.success,
+      sellerVerified: sellerVerification.success,
+      buyerDetails: buyerVerification.details,
+      sellerDetails: sellerVerification.details,
+      exchangeId: exchange.exchangeId,
+      verifiedAt: new Date().toISOString()
+    };
+
+    // Update exchange with verification results if successful
+    if (result.buyerVerified && result.sellerVerified) {
+      await ExchangeHistory.findOneAndUpdate(
+        { exchangeId },
+        {
+          buyerTxhash: buyerTx,
+          sellerTxhash: sellerTx,
+          status: 'verifying', // New status for verified but not yet transferred
+          updatedAt: new Date()
+        }
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: result.buyerVerified && result.sellerVerified ? 'Transactions verified successfully' : 'Transaction verification completed with issues',
+      result
+    });
+
+  } catch (err: any) {
+    console.error('Error verifying exchange transactions:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to verify transactions',
+      error: err?.message || String(err)
+    });
+  }
+};

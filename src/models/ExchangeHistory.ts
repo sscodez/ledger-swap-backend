@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface IExchangeHistory extends Document {
   user?: mongoose.Types.ObjectId | null; // Optional for anonymous exchanges
   exchangeId: string;
-  status: 'completed' | 'pending' | 'failed' | 'in_review' | 'expired' | 'processing' | 'confirming' | 'exchanging' | 'sending';
+  status: 'completed' | 'pending' | 'failed' | 'in_review' | 'expired' | 'processing' | 'confirming' | 'exchanging' | 'sending' | 'verifying';
   date: Date;
   from: { currency: string; amount: number };
   to: { currency: string; amount: number };
@@ -64,7 +64,7 @@ const exchangeHistorySchema: Schema = new Schema({
   },
   status: {
     type: String,
-    enum: ['completed', 'pending', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending'],
+    enum: ['completed', 'pending', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending', 'verifying'],
     default: 'pending',
   },
   date: {
