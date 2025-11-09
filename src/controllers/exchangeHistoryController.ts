@@ -27,6 +27,64 @@ export const createExchangeHistory: RequestHandler = async (req: Request, res: R
   }
 };
 
+export const updateExchangeHistory: RequestHandler = async (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
+  const { id } = req.params;
+
+  try {
+    if (!id) {
+      return res.status(400).json({ message: 'Exchange history ID is required' });
+    }
+
+    const allowedFields = [
+      'status',
+      'fees',
+      'cashback',
+      'buyerTxhash',
+      'sellerTxhash',
+      'depositAddressBuyer',
+      'depositAddressSeller',
+      'prefundTxHash',
+      'withdrawalTxId',
+      'sendAddressSeller',
+      'sendAddressBuyer',
+    ] as const;
+
+    const updates: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'No valid fields provided for update' });
+    }
+
+    const filter: Record<string, unknown> = { _id: id };
+    if (authReq.user?._id) {
+      filter.user = authReq.user._id;
+    }
+
+    const updated = await ExchangeHistory.findOneAndUpdate(filter, updates, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ message: 'Exchange history entry not found' });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: 'Server error', error: error.message });
+    } else {
+      res.status(500).json({ message: 'An unknown error occurred' });
+    }
+  }
+};
+
 export const getExchangeHistory: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
   try {

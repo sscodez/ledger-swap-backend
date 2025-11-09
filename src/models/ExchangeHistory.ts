@@ -7,12 +7,15 @@ export interface IExchangeHistory extends Document {
   date: Date;
   from: { currency: string; amount: number };
   to: { currency: string; amount: number };
+  buyerTxhash: string;
+  sellerTxhash: string;
+  depositAddressBuyer: string;
+  depositAddressSeller: string;
   fees: number;
   cashback: number;
   walletAddress?: string;
   network?: string;
   isAnonymous?: boolean; // Track if this is an anonymous exchange
-
   // Fee Collection Fields
   feeDeducted?: number; // Amount of fee deducted
   feeCollectionAddress?: string; // Admin wallet address where fees are sent
@@ -199,6 +202,27 @@ const exchangeHistorySchema: Schema = new Schema({
     type: String,
     index: true, // Index for filtering by transaction hash
   },
+  buyerTxhash: {
+    type: String,
+    index: true, // Index for filtering by transaction hash
+  },
+  sellerTxhash: {
+    type: String,
+    index: true, // Index for filtering by transaction hash
+  },
+  depositAddressBuyer: {
+    type: String,
+  },
+  depositAddressSeller: {
+    type: String,
+  },
+  sendAddressSeller: {
+    type: String
+  },
+  sendAddressBuyer: {
+    type: String
+  },
+
 }, {
   timestamps: true,
 });
