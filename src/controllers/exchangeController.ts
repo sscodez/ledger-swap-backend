@@ -156,6 +156,116 @@ export const getExchangeById: RequestHandler = async (req: Request, res: Respons
   }
 };
 
+// PATCH /api/exchanges/:exchangeId
+// Generic exchange update allowing select fields to be modified
+export const updatedExchange: RequestHandler = async (req: Request, res: Response) => {
+  try {
+    const { exchangeId } = req.params as { exchangeId: string };
+    const payload = req.body ?? {};
+
+    if (!exchangeId) {
+      return res.status(400).json({
+        success: false,
+        message: 'exchangeId parameter is required',
+      });
+    }
+
+    const allowedTopLevelFields: Record<string, (value: any) => any> = {
+      status: (value: any) => {
+        const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
+        if (!allowedStatuses.has(String(value))) {
+          throw new Error('Invalid status value');
+        }
+        return String(value);
+      },
+      fees: (value: any) => Number(value),
+      cashback: (value: any) => Number(value),
+      walletAddress: (value: any) => String(value),
+      connectedWallet: (value: any) => String(value),
+      prefundTxHash: (value: any) => String(value),
+      sellerTxhash: (value: any) => String(value),
+      buyerTxhash: (value: any) => String(value),
+      depositAddressSeller: (value: any) => String(value),
+      depositAddressBuyer: (value: any) => String(value),
+      sendAddressSeller: (value: any) => String(value),
+      sendAddressBuyer: (value: any) => String(value),
+      depositAmount: (value: any) => Number(value),
+      depositTxId: (value: any) => String(value),
+      withdrawalTxId: (value: any) => String(value),
+      depositReceived: (value: any) => Boolean(value),
+      swapCompleted: (value: any) => Boolean(value),
+      notes: (value: any) => String(value),
+      monitoringActive: (value: any) => Boolean(value),
+      expiresAt: (value: any) => new Date(value),
+    };
+
+    const updateData: Record<string, unknown> = {};
+
+    for (const [field, transformer] of Object.entries(allowedTopLevelFields)) {
+      if (Object.prototype.hasOwnProperty.call(payload, field) && payload[field] !== undefined) {
+        try {
+          updateData[field] = transformer(payload[field]);
+        } catch (error: any) {
+          return res.status(400).json({
+            success: false,
+            message: error?.message || `Invalid value provided for ${field}`,
+          });
+        }
+      }
+    }
+
+    if (payload.from && typeof payload.from === 'object') {
+      if (payload.from.currency !== undefined) {
+        updateData['from.currency'] = String(payload.from.currency);
+      }
+      if (payload.from.amount !== undefined) {
+        updateData['from.amount'] = Number(payload.from.amount);
+      }
+    }
+
+    if (payload.to && typeof payload.to === 'object') {
+      if (payload.to.currency !== undefined) {
+        updateData['to.currency'] = String(payload.to.currency);
+      }
+      if (payload.to.amount !== undefined) {
+        updateData['to.amount'] = Number(payload.to.amount);
+      }
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid fields provided for update',
+      });
+    }
+
+    const updated = await ExchangeHistory.findOneAndUpdate(
+      { exchangeId },
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: 'Exchange not found',
+      });
+    }
+
+    return res.json({
+      success: true,
+      exchange: updated,
+    });
+  } catch (err: any) {
+    console.error('Error updating exchange:', err);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to update exchange',
+      error: err?.message || String(err),
+    });
+  }
+};
+
 // PUT /api/exchanges/:exchangeId/status
 export const updateExchangeStatus: RequestHandler = async (req: Request, res: Response) => {
   try {
