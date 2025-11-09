@@ -4,7 +4,22 @@ import { AuthRequest } from '../middleware/authMiddleware';
 
 export const createExchangeHistory: RequestHandler = async (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const { exchangeId, status, from, to, fees, cashback } = req.body;
+  const {
+    exchangeId,
+    status,
+    from,
+    to,
+    fees,
+    cashback,
+    sellerTxhash,
+    depositAddressSeller,
+    prefundTxHash,
+    buyerTxhash,
+    depositAddressBuyer,
+    withdrawalTxId,
+    sendAddressSeller,
+    sendAddressBuyer,
+  } = req.body;
 
   try {
     const exchangeHistory = await ExchangeHistory.create({
@@ -15,6 +30,10 @@ export const createExchangeHistory: RequestHandler = async (req: Request, res: R
       to,
       fees,
       cashback,
+      sellerTxhash,
+      depositAddressSeller,
+      prefundTxHash,
+      sendAddressSeller,
     });
 
     res.status(201).json(exchangeHistory);
