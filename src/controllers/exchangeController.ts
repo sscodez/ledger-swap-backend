@@ -4,7 +4,7 @@ import ExchangeHistory from '../models/ExchangeHistory';
 import { checkComprehensiveFlagged } from '../utils/flaggedCheck';
 
 function generateExchangeId() {
-  return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+  return `ex-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
 
 // POST /api/exchanges
