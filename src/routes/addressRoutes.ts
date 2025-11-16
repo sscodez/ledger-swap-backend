@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createAddress, getAddresses, deleteAddress } from '../controllers/addressController';
+import { createAddress, getAddresses, deleteAddress, updateAddress } from '../controllers/addressController';
 import { protect } from '../middleware/authMiddleware';
 
 const router = Router();
@@ -52,6 +52,6 @@ router.route('/').post(protect, createAddress).get(protect, getAddresses);
  *       '200':
  *         description: Address deleted
  */
-router.route('/:id').delete(protect, deleteAddress);
+router.route('/:id').delete(protect, deleteAddress).put(protect, updateAddress);
 
 export default router;

@@ -61,3 +61,34 @@ export const deleteAddress: RequestHandler = async (req: Request, res: Response)
     }
   }
 };
+
+export const updateAddress: RequestHandler = async (req: Request, res: Response) => {
+  const authReq = req as AuthRequest;
+  const { coin, network, label, address } = req.body;
+
+  try {
+    const existingAddress = await Address.findById(req.params.id);
+
+    if (!existingAddress) {
+      return res.status(404).json({ message: 'Address not found' });
+    }
+
+    if (existingAddress.user.toString() !== String(authReq.user!._id)) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    existingAddress.coin = coin ?? existingAddress.coin;
+    existingAddress.network = network ?? existingAddress.network;
+    existingAddress.label = label ?? existingAddress.label;
+    existingAddress.address = address ?? existingAddress.address;
+
+    const updated = await existingAddress.save();
+    res.json(updated);
+  } catch (error) {
+    if (error instanceof Error) {
+      res.status(500).json({ message: 'Server error', error: error.message });
+    } else {
+      res.status(500).json({ message: 'An unknown error occurred' });
+    }
+  }
+};
