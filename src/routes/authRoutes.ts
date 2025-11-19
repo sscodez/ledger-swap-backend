@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, resetPassword } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -214,6 +214,48 @@ router.get('/facebook/callback', passport.authenticate('facebook', { failureRedi
  *         description: Server error
  */
 router.post('/forgot-password', loginRateLimit, forgotPassword);
+
+/**
+ * @openapi
+ * /api/auth/verify-reset-code:
+ *   post:
+ *     summary: Verify password reset code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               code:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *             required: [email, code]
+ *     responses:
+ *       '200':
+ *         description: Verification code confirmed, reset token provided
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 resetToken:
+ *                   type: string
+ *                 tokenExpires:
+ *                   type: number
+ *       '400':
+ *         description: Invalid or expired verification code
+ *       '500':
+ *         description: Server error
+ */
+router.post('/verify-reset-code', verifyResetCode);
 
 /**
  * @openapi

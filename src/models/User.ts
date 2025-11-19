@@ -17,6 +17,8 @@ export interface IUser extends Document {
   flaggedAt?: Date;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  resetPasswordCode?: string;
+  resetPasswordCodeExpires?: Date;
 }
 
 const userSchema: Schema = new Schema({
@@ -69,6 +71,12 @@ const userSchema: Schema = new Schema({
     type: String,
   },
   resetPasswordExpires: {
+    type: Date,
+  },
+  resetPasswordCode: {
+    type: String,
+  },
+  resetPasswordCodeExpires: {
     type: Date,
   },
 }, {

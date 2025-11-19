@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/authMiddleware';
 import SupportMessage from '../models/SupportMessage';
+import { sendAdminSupportEmail } from '../services/emailService';
 import User from '../models/User';
 import ExchangeHistory from '../models/ExchangeHistory';
 import Address from '../models/Address';
@@ -117,78 +118,57 @@ export const sendSupportEmail = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'subject and message are required' });
     }
 
-    const to = process.env.SUPPORT_EMAIL || 'support@ledgerswap.io';
-    const from = fromEmail || process.env.SUPPORT_FROM_EMAIL || 'no-reply@ledgerswap.io';
+    const authReq = req as AuthRequest;
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
 
-    const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
-
-    // Attempt to send via nodemailer if SMTP is configured
-    if (smtpHost && smtpPort && smtpUser && smtpPass) {
-      try {
-        // Dynamically import nodemailer to avoid hard dependency if not installed
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const nodemailer = require('nodemailer');
-        const transporter = nodemailer.createTransport({
-          host: smtpHost,
-          port: smtpPort,
-          secure: smtpPort === 465, // true for 465, false for other ports
-          auth: { user: smtpUser, pass: smtpPass },
-        });
-
-        await transporter.sendMail({
-          from,
-          to,
-          subject: `[Admin Support] ${subject}`,
-          text: message,
-        });
-
+    try {
+      // Attempt to send email using the email service
+      const emailSent = await sendAdminSupportEmail(subject, message, fromEmail);
+      
+      if (emailSent) {
         // Save record as sent
-        const authReq = req as AuthRequest;
         await SupportMessage.create({
           subject,
           message,
           fromEmail,
-          toEmail: to,
+          toEmail: adminEmail,
           status: 'sent',
           createdBy: authReq.user?._id,
         });
 
-        return res.status(200).json({ message: 'Support email sent' });
-      } catch (mailErr: any) {
-        console.error('Failed to send support email via SMTP:', mailErr?.message || mailErr);
-        // Save record as failed, then fall through to accepted/log
-        const authReq = req as AuthRequest;
-        try {
-          await SupportMessage.create({
-            subject,
-            message,
-            fromEmail,
-            toEmail: to,
-            status: 'failed',
-            error: mailErr?.message || String(mailErr),
-            createdBy: authReq.user?._id,
-          });
-        } catch (e) {
-          console.error('Failed to save failed support message record:', (e as any)?.message || e);
-        }
-      }
-    }
+        return res.status(200).json({ message: 'Support email sent successfully to admin@ledgerswap.io' });
+      } else {
+        // Email failed to send, save as failed
+        await SupportMessage.create({
+          subject,
+          message,
+          fromEmail,
+          toEmail: adminEmail,
+          status: 'failed',
+          error: 'Email service failed to send message',
+          createdBy: authReq.user?._id,
+        });
 
-    console.log('Support email request (SMTP not configured). To:', to, 'From:', from, 'Subject:', subject);
-    // Save record as accepted (not actually sent)
-    const authReq = req as AuthRequest;
-    await SupportMessage.create({
-      subject,
-      message,
-      fromEmail,
-      toEmail: to,
-      status: 'accepted',
-      createdBy: authReq.user?._id,
-    });
-    return res.status(202).json({ message: 'Support request accepted (email delivery not configured on server)' });
+        return res.status(500).json({ message: 'Failed to send support email. Please check SMTP configuration.' });
+      }
+    } catch (emailError: any) {
+      console.error('Support email error:', emailError);
+      
+      // Save record as accepted (logged but not sent)
+      await SupportMessage.create({
+        subject,
+        message,
+        fromEmail,
+        toEmail: adminEmail,
+        status: 'accepted',
+        error: 'SMTP not configured - message logged only',
+        createdBy: authReq.user?._id,
+      });
+      
+      return res.status(202).json({ 
+        message: 'Support request logged. Email delivery requires SMTP configuration.' 
+      });
+    }
   } catch (err: any) {
     res.status(500).json({ message: 'Failed to process support email', error: err.message });
   }

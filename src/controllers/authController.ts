@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import User from '../models/User';
 import Overview from '../models/Overview';
 import generateToken from '../utils/generateToken';
-import { sendPasswordResetEmail, sendPasswordResetConfirmation } from '../services/emailService';
+import { sendPasswordResetEmail, sendPasswordResetConfirmation, generateVerificationCode } from '../services/emailService';
 
 // Debug endpoint to check OAuth configuration
 export const debugOAuth = async (req: Request, res: Response) => {
@@ -204,7 +204,7 @@ export const facebookCallback = (req: Request, res: Response) => {
   }
 };
 
-// Forgot Password - Send reset email
+// Forgot Password - Send reset email with verification code
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
@@ -219,31 +219,74 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!user) {
       // Don't reveal if email exists or not for security
       return res.status(200).json({ 
-        message: 'If an account with that email exists, a password reset link has been sent.' 
+        message: 'If an account with that email exists, a password reset code has been sent.' 
       });
     }
 
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
+    // Generate 6-digit verification code
+    const resetCode = generateVerificationCode();
     
-    // Set token and expiration (1 hour)
-    user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour
+    // Set code and expiration (15 minutes)
+    user.resetPasswordCode = resetCode;
+    user.resetPasswordCodeExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
     
     await user.save();
 
-    // Send email
-    const emailSent = await sendPasswordResetEmail(user.email, resetToken);
+    // Send email with verification code
+    const emailSent = await sendPasswordResetEmail(user.email, resetCode);
     
     if (!emailSent) {
       return res.status(500).json({ message: 'Error sending email. Please try again.' });
     }
 
     res.status(200).json({ 
-      message: 'If an account with that email exists, a password reset link has been sent.' 
+      message: 'If an account with that email exists, a password reset code has been sent.',
+      codeExpires: 15 // minutes
     });
   } catch (error) {
     console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// Verify Reset Code - Verify the 6-digit code
+export const verifyResetCode = async (req: Request, res: Response) => {
+  try {
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and verification code are required' });
+    }
+
+    // Find user with valid reset code
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      resetPasswordCode: code,
+      resetPasswordCodeExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
+
+    // Generate a temporary token for password reset (valid for 10 minutes)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    
+    // Clear the verification code
+    user.resetPasswordCode = undefined;
+    user.resetPasswordCodeExpires = undefined;
+    
+    await user.save();
+
+    res.status(200).json({ 
+      message: 'Verification code confirmed',
+      resetToken,
+      tokenExpires: 10 // minutes
+    });
+  } catch (error) {
+    console.error('Verify reset code error:', error);
     res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };
@@ -275,6 +318,8 @@ export const resetPassword = async (req: Request, res: Response) => {
     user.password = password; // Will be hashed by pre-save middleware
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
+    user.resetPasswordCode = undefined;
+    user.resetPasswordCodeExpires = undefined;
     
     await user.save();
 
