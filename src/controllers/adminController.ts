@@ -122,21 +122,29 @@ export const sendSupportEmail = async (req: Request, res: Response) => {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
 
     try {
+      // Check if SMTP is configured
+      const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+      
       // Attempt to send email using the email service
       const emailSent = await sendAdminSupportEmail(subject, message, fromEmail);
       
       if (emailSent) {
-        // Save record as sent
+        // Save record with appropriate status
         await SupportMessage.create({
           subject,
           message,
           fromEmail,
           toEmail: adminEmail,
-          status: 'sent',
+          status: isSmtpConfigured ? 'sent' : 'accepted',
+          error: isSmtpConfigured ? undefined : 'SMTP not configured - message logged only',
           createdBy: authReq.user?._id,
         });
 
-        return res.status(200).json({ message: 'Support email sent successfully to admin@ledgerswap.io' });
+        if (isSmtpConfigured) {
+          return res.status(200).json({ message: 'Support email sent successfully to admin@ledgerswap.io' });
+        } else {
+          return res.status(202).json({ message: 'Support request logged successfully. Email delivery requires SMTP configuration.' });
+        }
       } else {
         // Email failed to send, save as failed
         await SupportMessage.create({
