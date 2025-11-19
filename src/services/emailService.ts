@@ -188,15 +188,19 @@ export const sendPasswordResetConfirmation = async (email: string) => {
   }
 };
 
+interface SupportEmailResult {
+  success: boolean;
+  mode: 'smtp' | 'mock';
+  error?: string;
+}
+
 // Send admin support notification email
-export const sendAdminSupportEmail = async (subject: string, message: string, fromEmail?: string) => {
+export const sendAdminSupportEmail = async (subject: string, message: string, fromEmail?: string): Promise<SupportEmailResult> => {
+  const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
+  const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+
   try {
     const transporter = createTransporter();
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
-    
-    // Check if we're in mock mode (SMTP not configured)
-    const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-    
     const mailOptions = {
       from: process.env.SMTP_USER || 'admin@ledgerswap.io',
       to: adminEmail,
@@ -236,24 +240,23 @@ export const sendAdminSupportEmail = async (subject: string, message: string, fr
     };
 
     await transporter.sendMail(mailOptions);
-    
+
     if (isSmtpConfigured) {
       console.log('Admin support email sent successfully to:', adminEmail);
     } else {
       console.log('Admin support email logged (SMTP not configured) to:', adminEmail);
     }
-    
-    return true;
+
+    return { success: true, mode: isSmtpConfigured ? 'smtp' : 'mock' };
   } catch (error) {
-    console.error('Error sending admin support email:', error);
-    
-    // In mock mode, we should still return true since the message was logged
-    const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
+    console.error('Error sending admin support email:', errorMessage);
+
     if (!isSmtpConfigured) {
-      console.log('Email logged successfully in mock mode despite error');
-      return true;
+      console.log('Email logged successfully in mock mode despite transporter error');
+      return { success: true, mode: 'mock' };
     }
-    
-    return false;
+
+    return { success: false, mode: 'smtp', error: errorMessage };
   }
 };

@@ -122,13 +122,11 @@ export const sendSupportEmail = async (req: Request, res: Response) => {
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
 
     try {
-      // Check if SMTP is configured
-      const isSmtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-      
       // Attempt to send email using the email service
-      const emailSent = await sendAdminSupportEmail(subject, message, fromEmail);
+      const emailResult = await sendAdminSupportEmail(subject, message, fromEmail);
+      const isSmtpConfigured = emailResult.mode === 'smtp';
       
-      if (emailSent) {
+      if (emailResult.success) {
         // Save record with appropriate status
         await SupportMessage.create({
           subject,
@@ -153,11 +151,11 @@ export const sendSupportEmail = async (req: Request, res: Response) => {
           fromEmail,
           toEmail: adminEmail,
           status: 'failed',
-          error: 'Email service failed to send message',
+          error: emailResult.error || 'Email service failed to send message',
           createdBy: authReq.user?._id,
         });
 
-        return res.status(500).json({ message: 'Failed to send support email. Please check SMTP configuration.' });
+        return res.status(500).json({ message: emailResult.error || 'Failed to send support email. Please check SMTP configuration.' });
       }
     } catch (emailError: any) {
       console.error('Support email error:', emailError);
