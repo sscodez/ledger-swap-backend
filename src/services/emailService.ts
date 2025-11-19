@@ -23,7 +23,7 @@ const createTransporter = () => {
   }
 
   // Create real transporter for Name.com or other SMTP providers
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
