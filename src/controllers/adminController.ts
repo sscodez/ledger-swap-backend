@@ -283,7 +283,7 @@ export const listTradeActivity = async (req: Request, res: Response) => {
 
     const [items, total] = await Promise.all([
       ExchangeHistory.find(query)
-        .select('walletAddress from to network status createdAt')
+        .select('walletAddress from to network status createdAt prefundTxHash')
         .sort(sort)
         .skip((pageNum - 1) * limitNum)
         .limit(limitNum),
@@ -297,6 +297,7 @@ export const listTradeActivity = async (req: Request, res: Response) => {
       network: it.network || null,
       status: it.status,
       time: it.createdAt,
+      prefundTxHash: it.prefundTxHash || null,
     }));
 
     res.json({
