@@ -3,11 +3,11 @@ import crypto from 'crypto';
 
 // Email service with Name.com SMTP support
 const createTransporter = () => {
-  const smtpHost = process.env.SMTP_HOST;
-  const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-  const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
+  const smtpHost = 'smtp.titan.email';
+  const smtpPort =  587;
+  const smtpUser = "admin@ledgerswap.io";
+  const smtpPass = "Matrix$345";
+  const smtpSecure = false;
 
   if (!smtpHost || !smtpUser || !smtpPass) {
     console.log('=== EMAIL MOCK MODE (SMTP not configured) ===');
