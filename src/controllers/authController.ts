@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import User from '../models/User';
 import Overview from '../models/Overview';
 import generateToken from '../utils/generateToken';
-import { sendPasswordResetEmail, sendPasswordResetConfirmation, generateVerificationCode } from '../services/emailService';
+import { sendPasswordResetEmail, sendPasswordResetConfirmation, generateVerificationCode, sendEmailVerification, sendWelcomeEmail, generateEmailVerificationToken } from '../services/emailService';
 
 // Debug endpoint to check OAuth configuration
 export const debugOAuth = async (req: Request, res: Response) => {
@@ -58,20 +58,36 @@ export const signup = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
+    // Generate email verification token
+    const emailVerificationToken = generateEmailVerificationToken();
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     const user = await User.create({
       name,
       email,
       password,
+      emailVerified: false,
+      emailVerificationToken,
+      emailVerificationExpires,
     });
 
     if (user) {
       await Overview.create({ user: user._id });
-      const token = generateToken(String(user._id));
+      
+      // Send verification email
+      const emailSent = await sendEmailVerification(user.email, emailVerificationToken);
+      
+      if (!emailSent) {
+        console.warn('Failed to send verification email to:', user.email);
+      }
+
+      // Return success response without token (user needs to verify email first)
       res.status(201).json({
         _id: user._id,
         name: user.name,
         email: user.email,
-        token,
+        emailVerified: false,
+        message: 'Account created successfully. Please check your email to verify your account.',
       });
     } else {
       res.status(400).json({ message: 'Invalid user data' });
@@ -127,11 +143,21 @@ export const signin = async (req: Request, res: Response) => {
     const user = await User.findOne({ email });
 
     if (user && user.password && (await bcrypt.compare(password, user.password))) {
+      // Check if email is verified (only for non-OAuth users)
+      if (!user.googleId && !user.facebookId && !user.emailVerified) {
+        return res.status(403).json({ 
+          message: 'Please verify your email address before signing in. Check your inbox for the verification link.',
+          emailVerified: false,
+          userId: user._id
+        });
+      }
+
       const token = generateToken(String(user._id));
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
+        emailVerified: user.emailVerified,
         token,
       });
     } else {
@@ -329,6 +355,109 @@ export const resetPassword = async (req: Request, res: Response) => {
     res.status(200).json({ message: 'Password has been reset successfully' });
   } catch (error) {
     console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// Verify Email - Verify email address with token
+export const verifyEmail = async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' });
+    }
+
+    // Find user with valid verification token
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationExpires: { $gt: new Date() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' });
+    }
+
+    // Update user as verified
+    user.emailVerified = true;
+    user.emailVerificationToken = undefined;
+    user.emailVerificationExpires = undefined;
+    
+    await user.save();
+
+    // Send welcome email
+    await sendWelcomeEmail(user.email, user.name);
+
+    // Generate token for automatic login
+    const authToken = generateToken(String(user._id));
+
+    res.status(200).json({ 
+      message: 'Email verified successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        emailVerified: true,
+      },
+      token: authToken
+    });
+  } catch (error) {
+    console.error('Verify email error:', error);
+    res.status(500).json({ message: 'Server error. Please try again.' });
+  }
+};
+
+// Resend Email Verification - Send new verification email
+export const resendEmailVerification = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({ 
+        message: 'If an account with that email exists and is not verified, a new verification email has been sent.' 
+      });
+    }
+
+    // Check if already verified
+    if (user.emailVerified) {
+      return res.status(400).json({ message: 'Email is already verified' });
+    }
+
+    // Check if user is OAuth user
+    if (user.googleId || user.facebookId) {
+      return res.status(400).json({ message: 'OAuth accounts do not require email verification' });
+    }
+
+    // Generate new verification token
+    const emailVerificationToken = generateEmailVerificationToken();
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+    
+    user.emailVerificationToken = emailVerificationToken;
+    user.emailVerificationExpires = emailVerificationExpires;
+    
+    await user.save();
+
+    // Send verification email
+    const emailSent = await sendEmailVerification(user.email, emailVerificationToken);
+    
+    if (!emailSent) {
+      return res.status(500).json({ message: 'Error sending email. Please try again.' });
+    }
+
+    res.status(200).json({ 
+      message: 'If an account with that email exists and is not verified, a new verification email has been sent.',
+      tokenExpires: 24 // hours
+    });
+  } catch (error) {
+    console.error('Resend email verification error:', error);
     res.status(500).json({ message: 'Server error. Please try again.' });
   }
 };

@@ -56,6 +56,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
           // Link Google account to existing user
           console.log('Linking Google account to existing user:', existingUser._id);
           existingUser.googleId = profile.id;
+          existingUser.emailVerified = true; // OAuth users are considered verified
           if (!existingUser.profilePicture && profile.photos?.[0]?.value) {
             existingUser.profilePicture = profile.photos[0].value;
           }
@@ -69,6 +70,7 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             name: profile.displayName || 'Google User',
             email: profile.emails[0].value,
             profilePicture: profile.photos?.[0]?.value,
+            emailVerified: true, // OAuth users are considered verified
           };
           console.log('User data to create:', userData);
           
@@ -119,6 +121,7 @@ if (process.env.FACEBOOK_APP_ID && process.env.FACEBOOK_APP_SECRET) {
           name: profile.displayName,
           email: profile.emails?.[0].value,
           profilePicture: profile.photos?.[0].value,
+          emailVerified: true, // OAuth users are considered verified
         });
       }
 

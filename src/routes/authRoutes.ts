@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword, verifyEmail, resendEmailVerification } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
 
 const router = Router();
@@ -285,5 +285,88 @@ router.post('/verify-reset-code', verifyResetCode);
  *         description: Server error
  */
 router.post('/reset-password', resetPassword);
+
+// Email Verification Routes
+/**
+ * @openapi
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Verify email address with token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *             required: [token]
+ *     responses:
+ *       '200':
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     emailVerified:
+ *                       type: boolean
+ *                 token:
+ *                   type: string
+ *       '400':
+ *         description: Invalid or expired verification token
+ *       '500':
+ *         description: Server error
+ */
+router.post('/verify-email', verifyEmail);
+
+/**
+ * @openapi
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required: [email]
+ *     responses:
+ *       '200':
+ *         description: Verification email sent (if account exists and is unverified)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 tokenExpires:
+ *                   type: number
+ *       '400':
+ *         description: Email already verified or OAuth account
+ *       '500':
+ *         description: Server error
+ */
+router.post('/resend-verification', loginRateLimit, resendEmailVerification);
 
 export default router;
