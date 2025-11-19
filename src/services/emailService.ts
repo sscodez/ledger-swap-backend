@@ -26,14 +26,14 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    secure: smtpSecure,
+    // secure: smtpSecure,
     auth: {
       user: smtpUser,
       pass: smtpPass,
     },
-    tls: {
-      rejectUnauthorized: false // For compatibility with some providers
-    }
+    // tls: {
+    //   rejectUnauthorized: false // For compatibility with some providers
+    // }
   });
 };
 
