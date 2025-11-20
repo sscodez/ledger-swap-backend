@@ -53,7 +53,7 @@ export const sendPasswordResetEmail = async (email: string, resetCode: string) =
     const transporter = createTransporter();
     
     const mailOptions = {
-      from: process.env.SMTP_USER || 'admin@ledgerswap.io',
+      from: 'admin@ledgerswap.io',
       to: email,
       subject: 'Password Reset Code - LedgerSwap',
       html: `
