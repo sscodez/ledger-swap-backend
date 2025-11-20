@@ -111,10 +111,10 @@ app.get('/api/email-status', async (req, res) => {
   try {
     const nodemailer = require('nodemailer');
     
-    const smtpHost = 'smtp.titan.email';
-    const smtpPort = 587;
-    const smtpUser = "admin@ledgerswap.io";
-    const smtpPass = "Qwerty$345";
+    const smtpHost = process.env.SMTP_HOST || 'mail.name.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+    const smtpUser = process.env.SMTP_USER || "admin@ledgerswap.io";
+    const smtpPass = process.env.SMTP_PASS || "Matrix$345";
     
     const isConfigured = !!(smtpHost && smtpUser && smtpPass);
     

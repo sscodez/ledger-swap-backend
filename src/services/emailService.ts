@@ -1,13 +1,13 @@
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
 
-// Email service with Name.com SMTP support
+// Email service with Titan email SMTP support
 const createTransporter = () => {
-  const smtpHost = 'smtp.titan.email';
-  const smtpPort =  587;
-  const smtpUser = "admin@ledgerswap.io";
-  const smtpPass = "Qwerty$345";
-  const smtpSecure = false;
+  const smtpHost = process.env.SMTP_HOST || 'smtp.titan.email';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+  const smtpUser = process.env.SMTP_USER || "admin@ledgerswap.io";
+  const smtpPass = process.env.SMTP_PASS;
+  const smtpSecure = process.env.SMTP_SECURE === 'true' || false;
 
   if (!smtpHost || !smtpUser || !smtpPass) {
     console.log('=== EMAIL MOCK MODE (SMTP not configured) ===');
@@ -22,18 +22,18 @@ const createTransporter = () => {
     };
   }
 
-  // Create real transporter for Name.com or other SMTP providers
+  // Create real transporter for Titan email SMTP
   return nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    secure: smtpSecure,
+    secure: smtpSecure, // false for port 587, true for port 465
     auth: {
       user: smtpUser,
       pass: smtpPass,
     },
-    // tls: {
-    //   rejectUnauthorized: false // For compatibility with some providers
-    // }
+    tls: {
+      rejectUnauthorized: false // For compatibility with Titan email
+    }
   });
 };
 
