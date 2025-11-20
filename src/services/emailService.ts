@@ -6,7 +6,7 @@ const createTransporter = () => {
   const smtpHost = 'smtp.titan.email';
   const smtpPort =  587;
   const smtpUser = "admin@ledgerswap.io";
-  const smtpPass = "Matrix$345";
+  const smtpPass = "Qwerty$345";
   const smtpSecure = false;
 
   if (!smtpHost || !smtpUser || !smtpPass) {
@@ -26,7 +26,7 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: smtpHost,
     port: smtpPort,
-    // secure: smtpSecure,
+    secure: smtpSecure,
     auth: {
       user: smtpUser,
       pass: smtpPass,
