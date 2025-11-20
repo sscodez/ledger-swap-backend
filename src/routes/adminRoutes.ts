@@ -364,7 +364,7 @@ router.post('/disputes/:id/reply', protect, isAdmin, adminReplyToDispute);
  *       '202':
  *         description: Accepted but email delivery not configured
  */
-router.post('/support/email', protect, isAdmin, sendSupportEmail);
+router.post('/support/email', sendSupportEmail);
 
 /**
  * @openapi
