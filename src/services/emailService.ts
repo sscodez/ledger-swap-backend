@@ -208,8 +208,7 @@ export const sendAdminSupportEmail = async (subject: string, message: string, fr
     const transporter = createTransporter();
     const mailOptions = {
       from: process.env.SMTP_USER || 'admin@ledgerswap.io',
-      to: adminEmail,
-      replyTo: fromEmail || undefined,
+      to: fromEmail,
       subject: `[LedgerSwap Support] ${subject}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
