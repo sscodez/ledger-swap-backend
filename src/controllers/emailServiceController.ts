@@ -217,7 +217,7 @@ export const getEmailServiceConfig = async (req: Request, res: Response) => {
     const smtpHost = 'smtp.titan.email';
     const smtpPort = 587;
     const smtpUser = "admin@ledgerswap.io";
-    const smtpPass = "Matrix$345";
+    const smtpPass = "Qwerty$345";
 
     res.json({
       success: true,
@@ -325,7 +325,7 @@ export const executeEmailCommand = async (req: Request, res: Response) => {
         try {
           const smtpHost = 'smtp.titan.email';
           const smtpUser = "admin@ledgerswap.io";
-          const smtpPass = "Matrix$345";
+          const smtpPass = "Qwerty$345";
 
           const transporter = nodemailer.createTransport({
             host: smtpHost,

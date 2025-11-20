@@ -5,8 +5,8 @@ import crypto from 'crypto';
 const createTransporter = () => {
   const smtpHost = 'smtp.titan.email';
   const smtpPort =  587;
-  const smtpUser = "info@ledgerswap.io";
-  const smtpPass = "Matrix$345";
+  const smtpUser = "admin@ledgerswap.io";
+  const smtpPass = "Qwerty$345";
   const smtpSecure = false;
 
   if (!smtpHost || !smtpUser || !smtpPass) {

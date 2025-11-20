@@ -106,6 +106,151 @@ app.get('/api-docs.json', (_req, res) => {
   res.send(swaggerSpec);
 });
 
+// Email Service Status Route
+app.get('/api/email-status', async (req, res) => {
+  try {
+    const nodemailer = require('nodemailer');
+    
+    const smtpHost = 'smtp.titan.email';
+    const smtpPort = 587;
+    const smtpUser = "admin@ledgerswap.io";
+    const smtpPass = "Qwerty$345";
+    
+    const isConfigured = !!(smtpHost && smtpUser && smtpPass);
+    
+    let connectionStatus = 'unknown';
+    let connectionError = null;
+
+    if (isConfigured) {
+      try {
+        const transporter = nodemailer.createTransport({
+          host: smtpHost,
+          port: smtpPort,
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
+          },
+        });
+
+        await transporter.verify();
+        connectionStatus = 'connected';
+      } catch (error) {
+        connectionStatus = 'failed';
+        connectionError = error instanceof Error ? error.message : 'Unknown connection error';
+      }
+    } else {
+      connectionStatus = 'not_configured';
+    }
+
+    res.json({
+      success: true,
+      status: 'healthy',
+      configuration: {
+        host: smtpHost || 'not_set',
+        port: smtpPort || 'not_set',
+        user: smtpUser ? smtpUser.replace(/(.{2}).*(@.*)/, '$1***$2') : 'not_set',
+        configured: isConfigured
+      },
+      connection: {
+        status: connectionStatus,
+        error: connectionError
+      },
+      mode: isConfigured ? 'smtp' : 'mock',
+      availableTypes: ['welcome', 'password_reset', 'support'],
+      testEndpoint: '/api/test-email',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Email status check error:', error);
+    res.status(500).json({
+      success: false,
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Test Email Route
+app.post('/api/test-email', async (req, res) => {
+  try {
+    const { sendPasswordResetEmail, sendWelcomeEmail, sendAdminSupportEmail } = require('./services/emailService');
+    const { to, type = 'welcome', subject, message } = req.body;
+
+    if (!to) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email address (to) is required'
+      });
+    }
+
+    let result = false;
+    let emailType = '';
+
+    console.log(`📧 Sending ${type} email to: ${to}`);
+
+    switch (type) {
+      case 'welcome':
+        result = await sendWelcomeEmail(to, 'Test User');
+        emailType = 'Welcome Email';
+        break;
+
+      case 'password_reset':
+        const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+        result = await sendPasswordResetEmail(to, resetCode);
+        emailType = 'Password Reset Email';
+        break;
+
+      case 'support':
+        const supportResult = await sendAdminSupportEmail(
+          subject || 'Test Support Email',
+          message || 'This is a test support email sent from the API test route.',
+          to
+        );
+        result = supportResult.success;
+        emailType = 'Support Email';
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email type. Use: welcome, password_reset, or support'
+        });
+    }
+
+    if (result) {
+      res.json({
+        success: true,
+        message: `${emailType} sent successfully`,
+        details: {
+          to: to,
+          type: type,
+          emailType: emailType,
+          timestamp: new Date().toISOString(),
+          note: 'Email sent via SMTP or logged in console if SMTP not configured'
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: `Failed to send ${emailType.toLowerCase()}`,
+        details: {
+          to: to,
+          type: type,
+          emailType: emailType
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/overview', overviewRoutes);
