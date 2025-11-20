@@ -14,7 +14,7 @@ export const checkEmailServiceHealth = async (req: Request, res: Response) => {
   try {
     const smtpHost = 'smtp.titan.email';
     const smtpPort = 587;
-    const smtpUser = "admin@ledgerswap.io";
+    const smtpUser = "info@ledgerswap.io";
     const smtpPass = "Matrix$345";
 
     // Check if SMTP configuration is available
