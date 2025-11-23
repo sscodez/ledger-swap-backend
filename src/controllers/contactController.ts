@@ -1,4 +1,5 @@
 import { Request, Response, RequestHandler } from 'express';
+import axios from 'axios';
 import { AuthRequest } from '../middleware/authMiddleware';
 import Contact from '../models/Contact';
 import Dispute from '../models/Dispute';
@@ -6,12 +7,39 @@ import Dispute from '../models/Dispute';
 // POST /api/contacts - Create a new contact submission
 export const createContact: RequestHandler = async (req: Request, res: Response) => {
   try {
-    const { name, email, subject, message, category = 'general' } = req.body;
+    const { name, email, subject, message, category = 'general', recaptchaToken } = req.body;
 
     if (!name || !email || !subject || !message) {
       return res.status(400).json({ 
         message: 'Name, email, subject, and message are required' 
       });
+    }
+
+    const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+    if (recaptchaSecret) {
+      if (!recaptchaToken) {
+        return res.status(400).json({ message: 'reCAPTCHA verification failed. Please try again.' });
+      }
+
+      try {
+        const verifyResponse = await axios.post(
+          'https://www.google.com/recaptcha/api/siteverify',
+          null,
+          {
+            params: {
+              secret: recaptchaSecret,
+              response: recaptchaToken
+            }
+          }
+        );
+
+        if (!verifyResponse.data.success) {
+          return res.status(400).json({ message: 'reCAPTCHA verification failed. Please try again.' });
+        }
+      } catch (captchaError) {
+        console.error('reCAPTCHA verification error:', captchaError);
+        return res.status(500).json({ message: 'Failed to verify reCAPTCHA. Please try again later.' });
+      }
     }
 
     // Determine if this should be treated as a dispute based on category or keywords
