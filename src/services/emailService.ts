@@ -399,50 +399,79 @@ export const sendCorridorConfirmationEmail = async (email: string, name: string)
       to: email,
       subject: 'Your Message Has Entered the Corridor',
       html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%); color: #ffffff;">
-          <div style="text-align: center; margin-bottom: 40px; padding: 30px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
-            <h1 style="color: #00d4ff; margin: 0; font-size: 28px; font-weight: 300; letter-spacing: 2px;">LedgerSwap</h1>
-            <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Secure Corridor</p>
-          </div>
-          
-          <div style="background: rgba(0, 212, 255, 0.05); padding: 40px 30px; border-radius: 12px; border: 1px solid rgba(0, 212, 255, 0.2); text-align: center;">
-            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%); border-radius: 50%; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);">
-              <span style="color: #0f0f23; font-size: 32px; font-weight: bold;">🔒</span>
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 0; background: #001233;">
+          <!-- Banner Section - Matching frontend banner -->
+          <div style="background: #001233; padding: 40px 20px; text-align: center; position: relative; overflow: hidden;">
+            <!-- Decorative elements -->
+            <div style="position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; opacity: 0.4;">
+              <div style="width: 100%; height: 100%; background: linear-gradient(45deg, #60a5fa, #a855f7); border-radius: 12px; transform: rotate(15deg);"></div>
+            </div>
+            <div style="position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; opacity: 0.4;">
+              <div style="width: 100%; height: 100%; background: linear-gradient(45deg, #3b82f6, #8b5cf6); border-radius: 8px; transform: rotate(-15deg);"></div>
             </div>
             
-            <h2 style="color: #00d4ff; margin: 0 0 25px 0; font-size: 24px; font-weight: 400;">Your Message Has Entered the Corridor</h2>
+            <h1 style="color: #ffffff; margin: 0 0 8px 0; font-size: 32px; font-weight: 600;">Contact the Corridor</h1>
+            <p style="color: #d1d5db; margin: 0; font-size: 14px;">
+              You're entering the protected channel of LedgerSwap.<br>
+              Our support guardians respond 24/7 with clarity, safety, and guidance.
+            </p>
+          </div>
+          
+          <!-- Main Content Section - White background like frontend cards -->
+          <div style="background: #ffffff; padding: 40px 30px; margin: 0;">
+            <!-- Success Icon -->
+            <div style="text-align: center; margin-bottom: 30px;">
+              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);">
+                <span style="color: #ffffff; font-size: 32px;">✓</span>
+              </div>
+            </div>
             
-            <div style="background: rgba(15, 15, 35, 0.8); padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #00d4ff;">
-              <p style="color: #ffffff; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+            <h2 style="color: #111827; margin: 0 0 25px 0; font-size: 24px; font-weight: 600; text-align: center;">Your Message Has Entered the Corridor</h2>
+            
+            <!-- Main Message Card -->
+            <div style="background: #f9fafb; padding: 25px; border-radius: 16px; margin: 25px 0; border-left: 4px solid #3b82f6;">
+              <p style="color: #374151; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
                 Thank you for reaching out to LedgerSwap.<br>
-                Your message has entered the Corridor and is now protected under our <strong style="color: #00d4ff;">Zero-Log Support Layer</strong>.
+                Your message has entered the Corridor and is now protected under our <strong style="color: #3b82f6;">Zero-Log Support Layer</strong>.
               </p>
               
-              <p style="color: rgba(255,255,255,0.9); margin: 15px 0; font-size: 15px; line-height: 1.6;">
+              <p style="color: #4b5563; margin: 15px 0; font-size: 15px; line-height: 1.6;">
                 Our guardian team reviews all inquiries in the order they align with system flow.<br>
                 We will respond if your request requires direct action.
               </p>
               
-              <p style="color: rgba(255,255,255,0.8); margin: 15px 0 0 0; font-size: 14px; font-style: italic;">
+              <p style="color: #6b7280; margin: 15px 0 0 0; font-size: 14px; font-style: italic;">
                 Thank you for respecting the silence.
               </p>
             </div>
             
-            <div style="margin-top: 30px; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 8px;">
-              <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #00d4ff;">Security Notice:</strong><br>
+            <!-- Security Notice Card -->
+            <div style="background: #0A1E56; padding: 20px; border-radius: 12px; margin-top: 30px;">
+              <p style="color: #d1d5db; margin: 0; font-size: 13px; line-height: 1.5; text-align: center;">
+                <strong style="color: #60a5fa;">Security Notice:</strong><br>
                 This communication is encrypted and logged with zero-knowledge protocols.<br>
                 Your privacy is maintained throughout the entire support process.
               </p>
             </div>
+            
+            <!-- How Can We Assist Section -->
+            <div style="margin-top: 30px; text-align: center;">
+              <h3 style="color: #374151; margin: 0 0 15px 0; font-size: 18px; font-weight: 600;">How Can We Assist?</h3>
+              <p style="color: #6b7280; margin: 0; font-size: 14px; line-height: 1.6;">
+                Choose the path that fits your need —<br>
+                technical support, security questions, or general assistance.<br>
+                Every message is handled with the same privacy and zero-log discipline that powers the platform.
+              </p>
+            </div>
           </div>
           
-          <div style="margin-top: 40px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center;">
-            <p style="color: rgba(255,255,255,0.6); font-size: 12px; margin: 0; line-height: 1.4;">
+          <!-- Footer Section - Dark like banner -->
+          <div style="background: #001233; padding: 30px 20px; text-align: center;">
+            <p style="color: #9ca3af; font-size: 12px; margin: 0; line-height: 1.4;">
               — LedgerSwap Support Guardians<br>
-              <span style="color: rgba(0, 212, 255, 0.8);">Secure • Private • Reliable</span>
+              <span style="color: #60a5fa;">Secure • Private • Reliable</span>
             </p>
-            <p style="color: rgba(255,255,255,0.4); font-size: 11px; margin: 15px 0 0 0;">
+            <p style="color: #6b7280; font-size: 11px; margin: 15px 0 0 0;">
               This email was sent from the LedgerSwap Corridor. Please do not reply to this email.
             </p>
           </div>
