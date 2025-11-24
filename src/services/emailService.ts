@@ -388,3 +388,73 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
     return false;
   }
 };
+
+// Send corridor confirmation email for contact form submissions
+export const sendCorridorConfirmationEmail = async (email: string, name: string) => {
+  try {
+    const transporter = createTransporter();
+    
+    const mailOptions = {
+      from: process.env.SMTP_USER || 'admin@ledgerswap.io',
+      to: email,
+      subject: 'Your Message Has Entered the Corridor',
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%); color: #ffffff;">
+          <div style="text-align: center; margin-bottom: 40px; padding: 30px 0; border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <h1 style="color: #00d4ff; margin: 0; font-size: 28px; font-weight: 300; letter-spacing: 2px;">LedgerSwap</h1>
+            <p style="color: rgba(255,255,255,0.7); margin: 8px 0 0 0; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Secure Corridor</p>
+          </div>
+          
+          <div style="background: rgba(0, 212, 255, 0.05); padding: 40px 30px; border-radius: 12px; border: 1px solid rgba(0, 212, 255, 0.2); text-align: center;">
+            <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%); border-radius: 50%; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);">
+              <span style="color: #0f0f23; font-size: 32px; font-weight: bold;">🔒</span>
+            </div>
+            
+            <h2 style="color: #00d4ff; margin: 0 0 25px 0; font-size: 24px; font-weight: 400;">Your Message Has Entered the Corridor</h2>
+            
+            <div style="background: rgba(15, 15, 35, 0.8); padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #00d4ff;">
+              <p style="color: #ffffff; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
+                Thank you for reaching out to LedgerSwap.<br>
+                Your message has entered the Corridor and is now protected under our <strong style="color: #00d4ff;">Zero-Log Support Layer</strong>.
+              </p>
+              
+              <p style="color: rgba(255,255,255,0.9); margin: 15px 0; font-size: 15px; line-height: 1.6;">
+                Our guardian team reviews all inquiries in the order they align with system flow.<br>
+                We will respond if your request requires direct action.
+              </p>
+              
+              <p style="color: rgba(255,255,255,0.8); margin: 15px 0 0 0; font-size: 14px; font-style: italic;">
+                Thank you for respecting the silence.
+              </p>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 8px;">
+              <p style="color: rgba(255,255,255,0.7); margin: 0; font-size: 13px; line-height: 1.5;">
+                <strong style="color: #00d4ff;">Security Notice:</strong><br>
+                This communication is encrypted and logged with zero-knowledge protocols.<br>
+                Your privacy is maintained throughout the entire support process.
+              </p>
+            </div>
+          </div>
+          
+          <div style="margin-top: 40px; padding-top: 25px; border-top: 1px solid rgba(255,255,255,0.1); text-align: center;">
+            <p style="color: rgba(255,255,255,0.6); font-size: 12px; margin: 0; line-height: 1.4;">
+              — LedgerSwap Support Guardians<br>
+              <span style="color: rgba(0, 212, 255, 0.8);">Secure • Private • Reliable</span>
+            </p>
+            <p style="color: rgba(255,255,255,0.4); font-size: 11px; margin: 15px 0 0 0;">
+              This email was sent from the LedgerSwap Corridor. Please do not reply to this email.
+            </p>
+          </div>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Corridor confirmation email sent successfully to:', email);
+    return true;
+  } catch (error) {
+    console.error('Error sending corridor confirmation email:', error);
+    return false;
+  }
+};

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { AuthRequest } from '../middleware/authMiddleware';
 import Contact from '../models/Contact';
 import Dispute from '../models/Dispute';
+import { sendCorridorConfirmationEmail } from '../services/emailService';
 
 // POST /api/contacts - Create a new contact submission
 export const createContact: RequestHandler = async (req: Request, res: Response) => {
@@ -70,6 +71,15 @@ export const createContact: RequestHandler = async (req: Request, res: Response)
       isDispute,
       status: 'open'
     });
+
+    // Send corridor confirmation email to the user
+    try {
+      await sendCorridorConfirmationEmail(email, name);
+      console.log('Corridor confirmation email sent to:', email);
+    } catch (emailError) {
+      console.error('Failed to send corridor confirmation email:', emailError);
+      // Don't fail the contact creation if email fails
+    }
 
     return res.status(201).json({
       message: 'Contact submission received successfully',
