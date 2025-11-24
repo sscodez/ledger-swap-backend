@@ -403,12 +403,7 @@ export const sendCorridorConfirmationEmail = async (email: string, name: string)
           <!-- Banner Section - Matching frontend banner -->
           <div style="background: #001233; padding: 40px 20px; text-align: center; position: relative; overflow: hidden;">
             <!-- Decorative elements -->
-            <div style="position: absolute; top: 20px; left: 20px; width: 60px; height: 60px; opacity: 0.4;">
-              <div style="width: 100%; height: 100%; background: linear-gradient(45deg, #60a5fa, #a855f7); border-radius: 12px; transform: rotate(15deg);"></div>
-            </div>
-            <div style="position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; opacity: 0.4;">
-              <div style="width: 100%; height: 100%; background: linear-gradient(45deg, #3b82f6, #8b5cf6); border-radius: 8px; transform: rotate(-15deg);"></div>
-            </div>
+        
             
             <h1 style="color: #ffffff; margin: 0 0 8px 0; font-size: 32px; font-weight: 600;">Contact the Corridor</h1>
             <p style="color: #d1d5db; margin: 0; font-size: 14px;">
@@ -420,16 +415,12 @@ export const sendCorridorConfirmationEmail = async (email: string, name: string)
           <!-- Main Content Section - White background like frontend cards -->
           <div style="background: #ffffff; padding: 40px 30px; margin: 0;">
             <!-- Success Icon -->
-            <div style="text-align: center; margin-bottom: 30px;">
-              <div style="width: 80px; height: 80px; background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%); border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 32px rgba(59, 130, 246, 0.3);">
-                <span style="color: #ffffff; font-size: 32px;">✓</span>
-              </div>
-            </div>
+          
             
             <h2 style="color: #111827; margin: 0 0 25px 0; font-size: 24px; font-weight: 600; text-align: center;">Your Message Has Entered the Corridor</h2>
             
             <!-- Main Message Card -->
-            <div style="background: #f9fafb; padding: 25px; border-radius: 16px; margin: 25px 0; border-left: 4px solid #3b82f6;">
+            <div style="background: #f9fafb; padding: 25px;  margin: 25px 0; ">
               <p style="color: #374151; margin: 0 0 15px 0; font-size: 16px; line-height: 1.6;">
                 Thank you for reaching out to LedgerSwap.<br>
                 Your message has entered the Corridor and is now protected under our <strong style="color: #3b82f6;">Zero-Log Support Layer</strong>.
