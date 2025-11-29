@@ -38,8 +38,6 @@ const contactRoutes_1 = __importDefault(require("./routes/contactRoutes"));
 const flaggedCheckRoutes_1 = __importDefault(require("./routes/flaggedCheckRoutes"));
 const chainRoutes_1 = __importDefault(require("./routes/chainRoutes"));
 const tokenRoutes_1 = __importDefault(require("./routes/tokenRoutes"));
-const bitcoinRoutes_1 = __importDefault(require("./routes/bitcoinRoutes"));
-// import escrowRoutes from './routes/escrowRoutes';
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -111,6 +109,136 @@ app.get('/api-docs.json', (_req, res) => {
     res.setHeader('Content-Type', 'application/json');
     res.send(swagger_1.default);
 });
+// Email Service Status Route
+app.get('/api/email-status', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const nodemailer = require('nodemailer');
+        const smtpHost = process.env.SMTP_HOST || 'mail.name.com';
+        const smtpPort = parseInt(process.env.SMTP_PORT || '587');
+        const smtpUser = process.env.SMTP_USER || "admin@ledgerswap.io";
+        const smtpPass = process.env.SMTP_PASS || "Matrix$345";
+        const isConfigured = !!(smtpHost && smtpUser && smtpPass);
+        let connectionStatus = 'unknown';
+        let connectionError = null;
+        if (isConfigured) {
+            try {
+                const transporter = nodemailer.createTransport({
+                    host: smtpHost,
+                    port: smtpPort,
+                    auth: {
+                        user: smtpUser,
+                        pass: smtpPass,
+                    },
+                });
+                yield transporter.verify();
+                connectionStatus = 'connected';
+            }
+            catch (error) {
+                connectionStatus = 'failed';
+                connectionError = error instanceof Error ? error.message : 'Unknown connection error';
+            }
+        }
+        else {
+            connectionStatus = 'not_configured';
+        }
+        res.json({
+            success: true,
+            status: 'healthy',
+            configuration: {
+                host: smtpHost || 'not_set',
+                port: smtpPort || 'not_set',
+                user: smtpUser ? smtpUser.replace(/(.{2}).*(@.*)/, '$1***$2') : 'not_set',
+                configured: isConfigured
+            },
+            connection: {
+                status: connectionStatus,
+                error: connectionError
+            },
+            mode: isConfigured ? 'smtp' : 'mock',
+            availableTypes: ['welcome', 'password_reset', 'support'],
+            testEndpoint: '/api/test-email',
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        console.error('Email status check error:', error);
+        res.status(500).json({
+            success: false,
+            status: 'unhealthy',
+            error: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+    }
+}));
+// Test Email Route
+app.post('/api/test-email', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { sendPasswordResetEmail, sendWelcomeEmail, sendAdminSupportEmail } = require('./services/emailService');
+        const { to, type = 'welcome', subject, message } = req.body;
+        if (!to) {
+            return res.status(400).json({
+                success: false,
+                error: 'Email address (to) is required'
+            });
+        }
+        let result = false;
+        let emailType = '';
+        console.log(`📧 Sending ${type} email to: ${to}`);
+        switch (type) {
+            case 'welcome':
+                result = yield sendWelcomeEmail(to, 'Test User');
+                emailType = 'Welcome Email';
+                break;
+            case 'password_reset':
+                const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+                result = yield sendPasswordResetEmail(to, resetCode);
+                emailType = 'Password Reset Email';
+                break;
+            case 'support':
+                const supportResult = yield sendAdminSupportEmail(subject || 'Test Support Email', message || 'This is a test support email sent from the API test route.', to);
+                result = supportResult.success;
+                emailType = 'Support Email';
+                break;
+            default:
+                return res.status(400).json({
+                    success: false,
+                    error: 'Invalid email type. Use: welcome, password_reset, or support'
+                });
+        }
+        if (result) {
+            res.json({
+                success: true,
+                message: `${emailType} sent successfully`,
+                details: {
+                    to: to,
+                    type: type,
+                    emailType: emailType,
+                    timestamp: new Date().toISOString(),
+                    note: 'Email sent via SMTP or logged in console if SMTP not configured'
+                }
+            });
+        }
+        else {
+            res.status(500).json({
+                success: false,
+                error: `Failed to send ${emailType.toLowerCase()}`,
+                details: {
+                    to: to,
+                    type: type,
+                    emailType: emailType
+                }
+            });
+        }
+    }
+    catch (error) {
+        console.error('Test email error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            timestamp: new Date().toISOString()
+        });
+    }
+}));
 app.use('/api/auth', authRoutes_1.default);
 app.use('/api/users', userRoutes_1.default);
 app.use('/api/overview', overviewRoutes_1.default);
@@ -129,9 +257,6 @@ app.use('/api/contacts', contactRoutes_1.default);
 app.use('/api/flagged-check', flaggedCheckRoutes_1.default);
 app.use('/api/chains', chainRoutes_1.default);
 app.use('/api/tokens', tokenRoutes_1.default);
-app.use('/api/bitcoin', bitcoinRoutes_1.default);
-// app.use('/api/xumm', xummRoutes);
-// app.use('/api/escrow', escrowRoutes);
 function start() {
     return __awaiter(this, void 0, void 0, function* () {
         try {

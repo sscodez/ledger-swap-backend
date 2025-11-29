@@ -48,7 +48,7 @@ const exchangeHistorySchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['completed', 'pending', 'failed', 'in_review', 'expired', 'processing'],
+        enum: ['completed', 'pending', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending', 'verifying'],
         default: 'pending',
     },
     date: {
@@ -175,6 +175,34 @@ const exchangeHistorySchema = new mongoose_1.Schema({
         type: Boolean,
         default: true,
         index: true, // Index for filtering active monitoring
+    },
+    connectedWallet: {
+        type: String,
+        index: true, // Index for filtering by connected wallet
+    },
+    prefundTxHash: {
+        type: String,
+        index: true, // Index for filtering by transaction hash
+    },
+    buyerTxhash: {
+        type: String,
+        index: true, // Index for filtering by transaction hash
+    },
+    sellerTxhash: {
+        type: String,
+        index: true, // Index for filtering by transaction hash
+    },
+    depositAddressBuyer: {
+        type: String,
+    },
+    depositAddressSeller: {
+        type: String,
+    },
+    sendAddressSeller: {
+        type: String
+    },
+    sendAddressBuyer: {
+        type: String
     },
 }, {
     timestamps: true,

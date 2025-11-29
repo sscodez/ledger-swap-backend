@@ -14,6 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.adminCreateToken = exports.adminSetTokenEnabled = exports.adminListTokens = exports.adminSetChainEnabled = exports.adminListChains = exports.updateUserRole = exports.listAllTransactions = exports.listFlaggedAddresses = exports.getAdminMetrics = exports.getFeeRevenueLastNDays = exports.updateSwapFeePercent = exports.getPlatformSettings = exports.listTradeActivity = exports.updatePlatformSettings = exports.listSupportMessages = exports.sendSupportEmail = exports.adminDeleteFlaggedAddress = exports.adminFlagAddress = exports.listUsers = void 0;
 const SupportMessage_1 = __importDefault(require("../models/SupportMessage"));
+const emailService_1 = require("../services/emailService");
 const User_1 = __importDefault(require("../models/User"));
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const Address_1 = __importDefault(require("../models/Address"));
@@ -113,74 +114,60 @@ const sendSupportEmail = (req, res) => __awaiter(void 0, void 0, void 0, functio
         if (!subject || !message) {
             return res.status(400).json({ message: 'subject and message are required' });
         }
-        const to = process.env.SUPPORT_EMAIL || 'support@ledgerswap.io';
-        const from = fromEmail || process.env.SUPPORT_FROM_EMAIL || 'no-reply@ledgerswap.io';
-        const smtpHost = process.env.SMTP_HOST;
-        const smtpPort = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : undefined;
-        const smtpUser = process.env.SMTP_USER;
-        const smtpPass = process.env.SMTP_PASS;
-        // Attempt to send via nodemailer if SMTP is configured
-        if (smtpHost && smtpPort && smtpUser && smtpPass) {
-            try {
-                // Dynamically import nodemailer to avoid hard dependency if not installed
-                // eslint-disable-next-line @typescript-eslint/no-var-requires
-                const nodemailer = require('nodemailer');
-                const transporter = nodemailer.createTransport({
-                    host: smtpHost,
-                    port: smtpPort,
-                    secure: smtpPort === 465, // true for 465, false for other ports
-                    auth: { user: smtpUser, pass: smtpPass },
-                });
-                yield transporter.sendMail({
-                    from,
-                    to,
-                    subject: `[Admin Support] ${subject}`,
-                    text: message,
-                });
-                // Save record as sent
-                const authReq = req;
+        const authReq = req;
+        const adminEmail = process.env.ADMIN_EMAIL || 'admin@ledgerswap.io';
+        try {
+            // Attempt to send email using the email service
+            const emailResult = yield (0, emailService_1.sendAdminSupportEmail)(subject, message, fromEmail);
+            const isSmtpConfigured = emailResult.mode === 'smtp';
+            if (emailResult.success) {
+                // Save record with appropriate status
                 yield SupportMessage_1.default.create({
                     subject,
                     message,
                     fromEmail,
-                    toEmail: to,
-                    status: 'sent',
+                    toEmail: adminEmail,
+                    status: isSmtpConfigured ? 'sent' : 'accepted',
+                    error: isSmtpConfigured ? undefined : 'SMTP not configured - message logged only',
                     createdBy: (_a = authReq.user) === null || _a === void 0 ? void 0 : _a._id,
                 });
-                return res.status(200).json({ message: 'Support email sent' });
+                if (isSmtpConfigured) {
+                    return res.status(200).json({ message: 'Support email sent successfully to admin@ledgerswap.io' });
+                }
+                else {
+                    return res.status(202).json({ message: 'Support request logged successfully. Email delivery requires SMTP configuration.' });
+                }
             }
-            catch (mailErr) {
-                console.error('Failed to send support email via SMTP:', (mailErr === null || mailErr === void 0 ? void 0 : mailErr.message) || mailErr);
-                // Save record as failed, then fall through to accepted/log
-                const authReq = req;
-                try {
-                    yield SupportMessage_1.default.create({
-                        subject,
-                        message,
-                        fromEmail,
-                        toEmail: to,
-                        status: 'failed',
-                        error: (mailErr === null || mailErr === void 0 ? void 0 : mailErr.message) || String(mailErr),
-                        createdBy: (_b = authReq.user) === null || _b === void 0 ? void 0 : _b._id,
-                    });
-                }
-                catch (e) {
-                    console.error('Failed to save failed support message record:', (e === null || e === void 0 ? void 0 : e.message) || e);
-                }
+            else {
+                // Email failed to send, save as failed
+                yield SupportMessage_1.default.create({
+                    subject,
+                    message,
+                    fromEmail,
+                    toEmail: adminEmail,
+                    status: 'failed',
+                    error: emailResult.error || 'Email service failed to send message',
+                    createdBy: (_b = authReq.user) === null || _b === void 0 ? void 0 : _b._id,
+                });
+                return res.status(500).json({ message: emailResult.error || 'Failed to send support email. Please check SMTP configuration.' });
             }
         }
-        console.log('Support email request (SMTP not configured). To:', to, 'From:', from, 'Subject:', subject);
-        // Save record as accepted (not actually sent)
-        const authReq = req;
-        yield SupportMessage_1.default.create({
-            subject,
-            message,
-            fromEmail,
-            toEmail: to,
-            status: 'accepted',
-            createdBy: (_c = authReq.user) === null || _c === void 0 ? void 0 : _c._id,
-        });
-        return res.status(202).json({ message: 'Support request accepted (email delivery not configured on server)' });
+        catch (emailError) {
+            console.error('Support email error:', emailError);
+            // Save record as accepted (logged but not sent)
+            yield SupportMessage_1.default.create({
+                subject,
+                message,
+                fromEmail,
+                toEmail: adminEmail,
+                status: 'accepted',
+                error: 'SMTP not configured - message logged only',
+                createdBy: (_c = authReq.user) === null || _c === void 0 ? void 0 : _c._id,
+            });
+            return res.status(202).json({
+                message: 'Support request logged. Email delivery requires SMTP configuration.'
+            });
+        }
     }
     catch (err) {
         res.status(500).json({ message: 'Failed to process support email', error: err.message });
@@ -258,7 +245,7 @@ const listTradeActivity = (req, res) => __awaiter(void 0, void 0, void 0, functi
         }
         const [items, total] = yield Promise.all([
             ExchangeHistory_1.default.find(query)
-                .select('walletAddress from to network status createdAt')
+                .select('walletAddress from to network status createdAt prefundTxHash')
                 .sort(sort)
                 .skip((pageNum - 1) * limitNum)
                 .limit(limitNum),
@@ -271,6 +258,7 @@ const listTradeActivity = (req, res) => __awaiter(void 0, void 0, void 0, functi
             network: it.network || null,
             status: it.status,
             time: it.createdAt,
+            prefundTxHash: it.prefundTxHash || null,
         }));
         res.json({
             page: pageNum,

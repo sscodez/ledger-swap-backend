@@ -360,7 +360,7 @@ router.post('/disputes/:id/reply', authMiddleware_1.protect, authMiddleware_1.is
  *       '202':
  *         description: Accepted but email delivery not configured
  */
-router.post('/support/email', authMiddleware_1.protect, authMiddleware_1.isAdmin, adminController_1.sendSupportEmail);
+router.post('/support/email', adminController_1.sendSupportEmail);
 /**
  * @openapi
  * /api/admin/support/messages:

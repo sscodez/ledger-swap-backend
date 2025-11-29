@@ -7,6 +7,10 @@ const router = (0, express_1.Router)();
 // POST /api/exchanges - Works for both authenticated and anonymous users
 // Creates a new exchange and returns { exchangeId, record }
 router.post('/', authMiddleware_1.optionalAuth, exchangeController_1.createExchange);
+router.get('/public', exchangeController_1.getPublicExchanges);
 router.get('/:exchangeId', authMiddleware_1.optionalAuth, exchangeController_1.getExchangeById);
+router.patch('/:exchangeId', authMiddleware_1.protect, exchangeController_1.updatedExchange);
+router.post('/:exchangeId/verify-transactions', authMiddleware_1.protect, exchangeController_1.verifyExchangeTransactions);
+router.post('/:exchangeId/complete', authMiddleware_1.optionalAuth, exchangeController_1.completeExchange);
 router.put('/:exchangeId/status', authMiddleware_1.protect, exchangeController_1.updateExchangeStatus);
 exports.default = router;

@@ -55,7 +55,6 @@ const addressSchema = new mongoose_1.Schema({
     address: {
         type: String,
         required: true,
-        unique: true,
     },
     flagged: {
         type: Boolean,
@@ -71,5 +70,6 @@ const addressSchema = new mongoose_1.Schema({
 }, {
     timestamps: true,
 });
+addressSchema.index({ user: 1, address: 1 }, { unique: true });
 const Address = mongoose_1.default.model('Address', addressSchema);
 exports.default = Address;

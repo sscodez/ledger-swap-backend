@@ -12,19 +12,18 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateExchangeStatus = exports.getExchangeById = exports.createExchange = void 0;
+exports.verifyExchangeTransactions = exports.completeExchange = exports.getPublicExchanges = exports.updateExchangeStatus = exports.updatedExchange = exports.getExchangeById = exports.createExchange = void 0;
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const flaggedCheck_1 = require("../utils/flaggedCheck");
-const CryptoFee_1 = __importDefault(require("../models/CryptoFee"));
 function generateExchangeId() {
-    return `EX-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+    return `ex-${Date.now()}-${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
 }
 // POST /api/exchanges
 // Creates a new exchange entry and returns server-generated exchangeId (and the created record)
 // Now supports both authenticated and anonymous users
 const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
-    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous, connectedWallet } = req.body || {};
+    const { fromCurrency, toCurrency, sendAmount, receiveAmount, fees = 0, cashback = 0, walletAddress, status, isAnonymous, connectedWallet, sellerTxhash, depositAddressSeller, sendAddressSeller, prefundTxHash, } = req.body || {};
     if (!fromCurrency || !toCurrency) {
         return res.status(400).json({ message: 'fromCurrency and toCurrency are required' });
     }
@@ -93,65 +92,9 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
         }
     }
     const exchangeId = generateExchangeId();
-    const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
+    const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
     const computedStatus = allowedStatuses.has(String(status)) ? String(status) : 'pending';
     try {
-        // Master deposit address fallback (legacy)
-        const MASTER_DEPOSIT_ADDRESS = '0xda791a424b294a594D81b09A86531CB1Dcf6b932';
-        let kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
-        let kucoinDepositCurrency = null;
-        let depositMemo = null;
-        let depositNetwork = null;
-        let feeCollectionAddress = null;
-        const fromCurrencyUpper = String(fromCurrency).toUpperCase();
-        console.log(`🔍 Setting up deposit address for: ${fromCurrencyUpper}`);
-        // Always use master deposit address but get fee configuration
-        try {
-            // Find the crypto fee configuration for this currency
-            const cryptoFeeConfig = yield CryptoFee_1.default.findOne({
-                symbol: fromCurrencyUpper,
-                isActive: true
-            });
-            if (cryptoFeeConfig) {
-                kucoinDepositCurrency = cryptoFeeConfig.symbol;
-                depositMemo = cryptoFeeConfig.depositMemo || null;
-                depositNetwork = cryptoFeeConfig.depositNetwork || null;
-                feeCollectionAddress = cryptoFeeConfig.feeCollectionAddress || null;
-                const adminConfiguredDepositAddress = cryptoFeeConfig.depositAddress
-                    || cryptoFeeConfig.feeCollectionAddress
-                    || cryptoFeeConfig.walletAddress
-                    || null;
-                if (adminConfiguredDepositAddress) {
-                    kucoinDepositAddress = adminConfiguredDepositAddress;
-                    console.log(`✅ Using admin-configured deposit address: ${kucoinDepositAddress}`);
-                }
-                else {
-                    console.log(`ℹ️ No admin deposit address configured, using master fallback: ${MASTER_DEPOSIT_ADDRESS}`);
-                }
-                console.log(`💰 Fee configuration found: ${cryptoFeeConfig.feePercentage}%`);
-                if (depositMemo)
-                    console.log(`📝 Deposit memo: ${depositMemo}`);
-                if (depositNetwork)
-                    console.log(`🌐 Network: ${depositNetwork}`);
-            }
-            else {
-                // Create default configuration if not exists
-                kucoinDepositCurrency = fromCurrencyUpper;
-                depositNetwork = ['ETH', 'USDT', 'USDC'].includes(fromCurrencyUpper)
-                    ? (fromCurrencyUpper === 'ETH' ? 'Ethereum' : 'ERC20')
-                    : fromCurrencyUpper;
-                console.log(`⚠️ No fee configuration found for ${fromCurrencyUpper}, using defaults`);
-                console.log(`🔄 Using master deposit address: ${MASTER_DEPOSIT_ADDRESS}`);
-            }
-        }
-        catch (configError) {
-            console.error('❌ Error fetching crypto fee configuration:', configError.message);
-            // Still use master address even if config fails
-            kucoinDepositCurrency = fromCurrencyUpper;
-            depositNetwork = fromCurrencyUpper;
-            kucoinDepositAddress = MASTER_DEPOSIT_ADDRESS;
-        }
-        // Set expiration time (5 minutes from now)
         const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
         const record = yield ExchangeHistory_1.default.create({
             user: shouldBeAnonymous ? null : authReq.user._id,
@@ -169,40 +112,20 @@ const createExchange = (req, res) => __awaiter(void 0, void 0, void 0, function*
             fees: Number(fees !== null && fees !== void 0 ? fees : 0),
             cashback: Number(cashback !== null && cashback !== void 0 ? cashback : 0),
             walletAddress: walletAddress ? String(walletAddress) : undefined,
-            // KuCoin Integration Fields
-            kucoinDepositAddress,
-            kucoinDepositCurrency,
-            depositMemo: depositMemo || undefined,
-            depositNetwork: depositNetwork || undefined,
+            connectedWallet: connectedWallet ? String(connectedWallet) : undefined,
+            sellerTxhash: sellerTxhash ? String(sellerTxhash) : undefined,
+            depositAddressSeller: depositAddressSeller ? String(depositAddressSeller) : undefined,
+            sendAddressSeller: sendAddressSeller ? String(sendAddressSeller) : undefined,
+            prefundTxHash: prefundTxHash ? String(prefundTxHash) : undefined,
             depositReceived: false,
             swapCompleted: false,
             expiresAt,
-            monitoringActive: true,
-            feeCollectionAddress: feeCollectionAddress || undefined,
+            monitoringActive: false,
         });
-        console.log(`🎯 Exchange created: ${exchangeId}`);
-        console.log(`📍 Deposit address: ${kucoinDepositAddress || 'Not generated'}`);
-        console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
-        // 🤖 AUTOMATIC SWAP INTEGRATION
-        // Add exchange to automatic swap monitoring system
-        if (kucoinDepositAddress && fromCurrency && sendAmount) {
-            try {
-                // Add to automated swap queue
-            }
-            catch (monitoringError) {
-                console.error(`⚠️ Failed to add ${exchangeId} to monitoring:`, monitoringError.message);
-                // Don't fail the exchange creation if monitoring fails
-            }
-        }
         return res.status(201).json({
             exchangeId,
             record,
-            depositAddress: kucoinDepositAddress,
-            depositMemo,
-            depositNetwork,
             expiresAt: expiresAt.toISOString(),
-            automatedMonitoring: !!kucoinDepositAddress, // Indicate if automated monitoring is active
-            addressSource: kucoinDepositAddress ? 'admin_configured' : 'not_available'
         });
     }
     catch (err) {
@@ -224,52 +147,126 @@ const getExchangeById = (req, res) => __awaiter(void 0, void 0, void 0, function
     }
 });
 exports.getExchangeById = getExchangeById;
+// PATCH /api/exchanges/:exchangeId
+// Generic exchange update allowing select fields to be modified
+const updatedExchange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const { exchangeId } = req.params;
+        const payload = (_a = req.body) !== null && _a !== void 0 ? _a : {};
+        if (!exchangeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'exchangeId parameter is required',
+            });
+        }
+        const allowedTopLevelFields = {
+            status: (value) => {
+                const allowedStatuses = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
+                if (!allowedStatuses.has(String(value))) {
+                    throw new Error('Invalid status value');
+                }
+                return String(value);
+            },
+            fees: (value) => Number(value),
+            cashback: (value) => Number(value),
+            walletAddress: (value) => String(value),
+            connectedWallet: (value) => String(value),
+            prefundTxHash: (value) => String(value),
+            sellerTxhash: (value) => String(value),
+            buyerTxhash: (value) => String(value),
+            depositAddressSeller: (value) => String(value),
+            depositAddressBuyer: (value) => String(value),
+            sendAddressSeller: (value) => String(value),
+            sendAddressBuyer: (value) => String(value),
+            depositAmount: (value) => Number(value),
+            depositTxId: (value) => String(value),
+            withdrawalTxId: (value) => String(value),
+            depositReceived: (value) => Boolean(value),
+            swapCompleted: (value) => Boolean(value),
+            notes: (value) => String(value),
+            monitoringActive: (value) => Boolean(value),
+            expiresAt: (value) => new Date(value),
+        };
+        const updateData = {};
+        for (const [field, transformer] of Object.entries(allowedTopLevelFields)) {
+            if (Object.prototype.hasOwnProperty.call(payload, field) && payload[field] !== undefined) {
+                try {
+                    updateData[field] = transformer(payload[field]);
+                }
+                catch (error) {
+                    return res.status(400).json({
+                        success: false,
+                        message: (error === null || error === void 0 ? void 0 : error.message) || `Invalid value provided for ${field}`,
+                    });
+                }
+            }
+        }
+        if (payload.from && typeof payload.from === 'object') {
+            if (payload.from.currency !== undefined) {
+                updateData['from.currency'] = String(payload.from.currency);
+            }
+            if (payload.from.amount !== undefined) {
+                updateData['from.amount'] = Number(payload.from.amount);
+            }
+        }
+        if (payload.to && typeof payload.to === 'object') {
+            if (payload.to.currency !== undefined) {
+                updateData['to.currency'] = String(payload.to.currency);
+            }
+            if (payload.to.amount !== undefined) {
+                updateData['to.amount'] = Number(payload.to.amount);
+            }
+        }
+        if (Object.keys(updateData).length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No valid fields provided for update',
+            });
+        }
+        const updated = yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, updateData, { new: true, runValidators: true });
+        if (!updated) {
+            return res.status(404).json({
+                success: false,
+                message: 'Exchange not found',
+            });
+        }
+        return res.json({
+            success: true,
+            exchange: updated,
+        });
+    }
+    catch (err) {
+        console.error('Error updating exchange:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update exchange',
+            error: (err === null || err === void 0 ? void 0 : err.message) || String(err),
+        });
+    }
+});
+exports.updatedExchange = updatedExchange;
 // PUT /api/exchanges/:exchangeId/status
 const updateExchangeStatus = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { exchangeId } = req.params;
-        const { status, kucoinOrderId, depositTxId, withdrawalTxId, depositAmount } = req.body;
-        const allowed = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing']);
+        const { status, depositTxId, withdrawalTxId, depositAmount, prefundTxHash } = req.body;
+        const allowed = new Set(['pending', 'completed', 'failed', 'in_review', 'expired', 'processing', 'confirming', 'exchanging', 'sending']);
         if (!status || !allowed.has(String(status))) {
             return res.status(400).json({ message: 'Invalid status' });
         }
         const updateData = { status: String(status) };
-        // Add optional KuCoin fields if provided
-        if (kucoinOrderId)
-            updateData.kucoinOrderId = kucoinOrderId;
         if (depositTxId)
             updateData.depositTxId = depositTxId;
         if (withdrawalTxId)
             updateData.withdrawalTxId = withdrawalTxId;
         if (depositAmount !== undefined)
             updateData.depositAmount = Number(depositAmount);
+        if (prefundTxHash)
+            updateData.prefundTxHash = prefundTxHash;
         // Update monitoring and completion flags based on status
-        if (status === 'processing') {
+        if (status === 'processing' || status === 'confirming' || status === 'exchanging' || status === 'sending') {
             updateData.depositReceived = true;
-            // 🤖 AUTOMATED SWAP INTEGRATION
-            // Trigger automated swap when status changes to processing
-            try {
-                const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
-                if (exchange && exchange.kucoinDepositAddress) {
-                    console.log(`🚀 Triggering automated swap for ${exchangeId} (status: processing)`);
-                    // Create mock deposit event for automated swap processing
-                    const mockDepositEvent = {
-                        exchangeId: exchange.exchangeId,
-                        txHash: depositTxId || `mock_tx_${Date.now()}`,
-                        fromAddress: 'user_wallet_address',
-                        toAddress: exchange.kucoinDepositAddress,
-                        amount: (depositAmount || exchange.from.amount).toString(),
-                        token: exchange.from.currency.toUpperCase(),
-                        chain: 'ethereum', // Default chain
-                        blockNumber: Date.now(),
-                        confirmations: 12 // Assume sufficient confirmations
-                    };
-                }
-            }
-            catch (swapError) {
-                console.error(`⚠️ Failed to trigger automated swap for ${exchangeId}:`, swapError.message);
-                // Don't fail the status update if automated swap fails
-            }
         }
         else if (status === 'completed') {
             updateData.swapCompleted = true;
@@ -288,3 +285,269 @@ const updateExchangeStatus = (req, res) => __awaiter(void 0, void 0, void 0, fun
     }
 });
 exports.updateExchangeStatus = updateExchangeStatus;
+// GET /api/exchanges/public
+// Get all public exchanges with optional filtering and pagination
+const getPublicExchanges = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { sendCurrency, receiveCurrency, status, page = '1', limit = '10' } = req.query;
+        // Build filter object
+        const filter = {};
+        if (sendCurrency) {
+            filter['from.currency'] = sendCurrency;
+        }
+        if (receiveCurrency) {
+            filter['to.currency'] = receiveCurrency;
+        }
+        if (status) {
+            filter.status = status;
+        }
+        // Pagination
+        const pageNum = parseInt(page, 10);
+        const limitNum = parseInt(limit, 10);
+        const skip = (pageNum - 1) * limitNum;
+        // Get total count for pagination
+        const totalCount = yield ExchangeHistory_1.default.countDocuments(filter);
+        // Get exchanges, sorted by creation date (newest first)
+        const exchanges = yield ExchangeHistory_1.default.find(filter)
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .lean();
+        // Transform to match frontend interface
+        const transformedExchanges = exchanges.map(exchange => ({
+            _id: exchange._id,
+            exchangeId: exchange.exchangeId,
+            sendAmount: exchange.from.amount,
+            sendCurrency: exchange.from.currency,
+            receiveCurrency: exchange.to.currency,
+            receiveAmount: exchange.to.amount,
+            walletAddress: exchange.walletAddress,
+            status: exchange.status || 'pending',
+            createdAt: exchange.createdAt,
+            isAnonymous: exchange.isAnonymous || false,
+            connectedWallet: exchange.connectedWallet,
+            prefundTxHash: exchange.prefundTxHash
+        }));
+        return res.json({
+            success: true,
+            exchanges: transformedExchanges,
+            count: transformedExchanges.length,
+            totalCount: totalCount,
+            currentPage: pageNum,
+            totalPages: Math.ceil(totalCount / limitNum),
+            hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+            hasPrevPage: pageNum > 1
+        });
+    }
+    catch (err) {
+        console.error('Error fetching public exchanges:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch exchanges',
+            error: (err === null || err === void 0 ? void 0 : err.message) || String(err)
+        });
+    }
+});
+exports.getPublicExchanges = getPublicExchanges;
+// POST /api/exchanges/:exchangeId/complete
+// Mark an exchange as completed with transaction hash
+const completeExchange = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { exchangeId } = req.params;
+        const { prefundTxHash, connectedWallet, status = 'completed' } = req.body;
+        if (!prefundTxHash) {
+            return res.status(400).json({
+                success: false,
+                message: 'Transaction hash is required'
+            });
+        }
+        // Find and update the exchange
+        const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
+        if (!exchange) {
+            return res.status(404).json({
+                success: false,
+                message: 'Exchange not found'
+            });
+        }
+        // Check if already completed
+        if (exchange.status === 'completed' || exchange.prefundTxHash) {
+            return res.status(400).json({
+                success: false,
+                message: 'Exchange is already completed'
+            });
+        }
+        // Update the exchange
+        exchange.prefundTxHash = prefundTxHash;
+        exchange.status = status;
+        if (connectedWallet) {
+            exchange.connectedWallet = connectedWallet;
+        }
+        exchange.updatedAt = new Date();
+        yield exchange.save();
+        return res.json({
+            success: true,
+            message: 'Exchange completed successfully',
+            exchange: {
+                exchangeId: exchange.exchangeId,
+                status: exchange.status,
+                prefundTxHash: exchange.prefundTxHash,
+                updatedAt: exchange.updatedAt
+            }
+        });
+    }
+    catch (err) {
+        console.error('Error completing exchange:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to complete exchange',
+            error: (err === null || err === void 0 ? void 0 : err.message) || String(err)
+        });
+    }
+});
+exports.completeExchange = completeExchange;
+// POST /api/exchanges/:exchangeId/verify-transactions
+// Verify buyer and seller transactions for an exchange
+const verifyExchangeTransactions = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { exchangeId } = req.params;
+        const { buyerTxHash, sellerTxHash } = req.body;
+        if (!exchangeId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Exchange ID is required'
+            });
+        }
+        const exchange = yield ExchangeHistory_1.default.findOne({ exchangeId });
+        if (!exchange) {
+            return res.status(404).json({
+                success: false,
+                message: 'Exchange not found'
+            });
+        }
+        const buyerTx = buyerTxHash || exchange.buyerTxhash || exchange.prefundTxHash;
+        const sellerTx = sellerTxHash || exchange.sellerTxhash;
+        if (!buyerTx || !sellerTx) {
+            return res.status(400).json({
+                success: false,
+                message: 'Both buyer and seller transaction hashes are required'
+            });
+        }
+        // Get admin wallet addresses
+        const ADMIN_WALLETS = {
+            XRP: process.env.ADMIN_XRP_ADDRESS || 'rPEPPER7kfTD9w2To4CQk6UCfuHM9c6GDY',
+            BTC: process.env.ADMIN_BTC_ADDRESS || 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx',
+            XDC: process.env.ADMIN_XDC_ADDRESS || 'xdc50a231ac1c605f271a2f7e9b40a466bba07d2b87',
+            IOTA: process.env.ADMIN_IOTA_ADDRESS || '0x223f679b3d44f25cd0d9b07428217bb68928f05808e5f567b5754f247f45360d',
+            XLM: process.env.ADMIN_XLM_ADDRESS || 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF',
+        };
+        const buyerCurrency = String(exchange.from.currency).toUpperCase();
+        const sellerCurrency = String(exchange.to.currency).toUpperCase();
+        const adminBuyerWallet = ADMIN_WALLETS[buyerCurrency];
+        const adminSellerWallet = ADMIN_WALLETS[sellerCurrency];
+        if (!adminBuyerWallet || !adminSellerWallet) {
+            return res.status(400).json({
+                success: false,
+                message: 'Admin wallet addresses not configured for verification'
+            });
+        }
+        // Verify transactions (basic format validation for now)
+        const verifyTransaction = (txHash, currency, expectedRecipient) => {
+            const upperCurrency = currency.toUpperCase();
+            // Basic transaction hash format validation
+            if (!txHash || txHash.length < 10) {
+                return { success: false, details: { error: 'Invalid transaction hash format' } };
+            }
+            // Currency-specific validation
+            switch (upperCurrency) {
+                case 'BTC':
+                case 'BITCOIN':
+                    if (!/^[a-fA-F0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid Bitcoin transaction hash format' } };
+                    }
+                    break;
+                case 'ETH':
+                case 'USDT':
+                case 'USDC':
+                    if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid Ethereum transaction hash format' } };
+                    }
+                    break;
+                case 'XRP':
+                    if (!/^[A-F0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid XRP transaction hash format' } };
+                    }
+                    break;
+                case 'XLM':
+                case 'STELLAR':
+                    if (!/^[a-fA-F0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid Stellar transaction hash format' } };
+                    }
+                    break;
+                case 'IOTA':
+                case 'MIOTA':
+                    if (!/^[A-Z0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid IOTA transaction hash format' } };
+                    }
+                    break;
+                case 'XDC':
+                    if (!/^0x[a-fA-F0-9]{64}$/.test(txHash)) {
+                        return { success: false, details: { error: 'Invalid XDC transaction hash format' } };
+                    }
+                    break;
+                default:
+                    if (txHash.length < 10) {
+                        return { success: false, details: { error: 'Transaction hash too short' } };
+                    }
+            }
+            // TODO: In production, integrate with blockchain APIs to verify:
+            // 1. Transaction exists
+            // 2. Transaction was sent TO the expected recipient (admin wallet)
+            // 3. Transaction amount matches expected amount
+            // 4. Transaction is confirmed
+            return {
+                success: true,
+                details: {
+                    txHash,
+                    currency: upperCurrency,
+                    expectedRecipient,
+                    verifiedAt: new Date().toISOString(),
+                    status: 'verified',
+                    note: 'Basic format validation passed - full blockchain verification needed in production'
+                }
+            };
+        };
+        const buyerVerification = verifyTransaction(buyerTx, buyerCurrency, adminBuyerWallet);
+        const sellerVerification = verifyTransaction(sellerTx, sellerCurrency, adminSellerWallet);
+        const result = {
+            buyerVerified: buyerVerification.success,
+            sellerVerified: sellerVerification.success,
+            buyerDetails: buyerVerification.details,
+            sellerDetails: sellerVerification.details,
+            exchangeId: exchange.exchangeId,
+            verifiedAt: new Date().toISOString()
+        };
+        // Update exchange with verification results if successful
+        if (result.buyerVerified && result.sellerVerified) {
+            yield ExchangeHistory_1.default.findOneAndUpdate({ exchangeId }, {
+                buyerTxhash: buyerTx,
+                sellerTxhash: sellerTx,
+                status: 'verifying', // New status for verified but not yet transferred
+                updatedAt: new Date()
+            });
+        }
+        return res.json({
+            success: true,
+            message: result.buyerVerified && result.sellerVerified ? 'Transactions verified successfully' : 'Transaction verification completed with issues',
+            result
+        });
+    }
+    catch (err) {
+        console.error('Error verifying exchange transactions:', err);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to verify transactions',
+            error: (err === null || err === void 0 ? void 0 : err.message) || String(err)
+        });
+    }
+});
+exports.verifyExchangeTransactions = verifyExchangeTransactions;

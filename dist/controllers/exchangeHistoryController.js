@@ -12,11 +12,11 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getExchangeHistory = exports.createExchangeHistory = void 0;
+exports.getExchangeHistory = exports.updateExchangeHistory = exports.createExchangeHistory = void 0;
 const ExchangeHistory_1 = __importDefault(require("../models/ExchangeHistory"));
 const createExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
-    const { exchangeId, status, from, to, fees, cashback } = req.body;
+    const { exchangeId, status, from, to, fees, cashback, sellerTxhash, depositAddressSeller, prefundTxHash, buyerTxhash, depositAddressBuyer, withdrawalTxId, sendAddressSeller, sendAddressBuyer, } = req.body;
     try {
         const exchangeHistory = yield ExchangeHistory_1.default.create({
             user: authReq.user._id,
@@ -26,6 +26,10 @@ const createExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, fu
             to,
             fees,
             cashback,
+            sellerTxhash,
+            depositAddressSeller,
+            prefundTxHash,
+            sendAddressSeller,
         });
         res.status(201).json(exchangeHistory);
     }
@@ -39,6 +43,59 @@ const createExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, fu
     }
 });
 exports.createExchangeHistory = createExchangeHistory;
+const updateExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const authReq = req;
+    const { id } = req.params;
+    try {
+        if (!id) {
+            return res.status(400).json({ message: 'Exchange history ID is required' });
+        }
+        const allowedFields = [
+            'status',
+            'fees',
+            'cashback',
+            'buyerTxhash',
+            'sellerTxhash',
+            'depositAddressBuyer',
+            'depositAddressSeller',
+            'prefundTxHash',
+            'withdrawalTxId',
+            'sendAddressSeller',
+            'sendAddressBuyer',
+        ];
+        const updates = {};
+        for (const field of allowedFields) {
+            if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+                updates[field] = req.body[field];
+            }
+        }
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ message: 'No valid fields provided for update' });
+        }
+        const filter = { _id: id };
+        if ((_a = authReq.user) === null || _a === void 0 ? void 0 : _a._id) {
+            filter.user = authReq.user._id;
+        }
+        const updated = yield ExchangeHistory_1.default.findOneAndUpdate(filter, updates, {
+            new: true,
+            runValidators: true,
+        });
+        if (!updated) {
+            return res.status(404).json({ message: 'Exchange history entry not found' });
+        }
+        res.json(updated);
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            res.status(500).json({ message: 'Server error', error: error.message });
+        }
+        else {
+            res.status(500).json({ message: 'An unknown error occurred' });
+        }
+    }
+});
+exports.updateExchangeHistory = updateExchangeHistory;
 const getExchangeHistory = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
     try {

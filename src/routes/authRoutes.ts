@@ -1,7 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword, verifyEmail, resendEmailVerification } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword, verifyEmail, resendEmailVerification, startTwoFactorSetup, verifyTwoFactorSetup, disableTwoFactor, verifyTwoFactorLogin } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
+import { protect } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -368,5 +369,91 @@ router.post('/verify-email', verifyEmail);
  *         description: Server error
  */
 router.post('/resend-verification', loginRateLimit, resendEmailVerification);
+
+/**
+ * @openapi
+ * /api/auth/2fa/start:
+ *   post:
+ *     summary: Initiate two-factor authentication setup
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Returns QR code and secret for setup
+ */
+router.post('/2fa/start', protect, startTwoFactorSetup);
+
+/**
+ * @openapi
+ * /api/auth/2fa/verify-setup:
+ *   post:
+ *     summary: Confirm and enable two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: 6-digit TOTP code
+ *             required: [token]
+ *     responses:
+ *       '200':
+ *         description: Two-factor authentication enabled
+ */
+router.post('/2fa/verify-setup', protect, verifyTwoFactorSetup);
+
+/**
+ * @openapi
+ * /api/auth/2fa/disable:
+ *   post:
+ *     summary: Disable two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Two-factor authentication disabled
+ */
+router.post('/2fa/disable', protect, disableTwoFactor);
+
+/**
+ * @openapi
+ * /api/auth/2fa/verify-login:
+ *   post:
+ *     summary: Verify TOTP during login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               loginToken:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *             required: [loginToken, code]
+ *     responses:
+ *       '200':
+ *         description: Login completed
+ */
+router.post('/2fa/verify-login', loginRateLimit, verifyTwoFactorLogin);
 
 export default router;

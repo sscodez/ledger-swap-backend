@@ -99,6 +99,44 @@ const userSchema = new mongoose_1.Schema({
     resetPasswordExpires: {
         type: Date,
     },
+    resetPasswordCode: {
+        type: String,
+    },
+    resetPasswordCodeExpires: {
+        type: Date,
+    },
+    emailVerified: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    emailVerificationToken: {
+        type: String,
+    },
+    emailVerificationExpires: {
+        type: Date,
+    },
+    twoFactorEnabled: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    twoFactorSecret: {
+        type: String,
+    },
+    twoFactorTempSecret: {
+        type: String,
+    },
+    twoFactorEnabledAt: {
+        type: Date,
+    },
+    twoFactorLoginToken: {
+        type: String,
+    },
+    twoFactorLoginExpires: {
+        type: Date,
+        index: true,
+    },
 }, {
     timestamps: true,
 });

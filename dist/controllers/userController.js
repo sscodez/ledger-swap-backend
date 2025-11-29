@@ -24,6 +24,7 @@ const getUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, function*
             phone: authReq.user.phone,
             country: authReq.user.country,
             profilePicture: authReq.user.profilePicture,
+            twoFactorEnabled: authReq.user.twoFactorEnabled,
         });
     }
     else {
@@ -51,6 +52,7 @@ const updateUserProfile = (req, res) => __awaiter(void 0, void 0, void 0, functi
             phone: updatedUser.phone,
             country: updatedUser.country,
             profilePicture: updatedUser.profilePicture,
+            twoFactorEnabled: updatedUser.twoFactorEnabled,
         });
     }
     else {

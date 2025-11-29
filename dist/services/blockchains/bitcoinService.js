@@ -56,6 +56,9 @@ const bitcoin = __importStar(require("bitcoinjs-lib"));
 const ecpair_1 = require("ecpair");
 const tinysecp = __importStar(require("tiny-secp256k1"));
 const ECPair = (0, ecpair_1.ECPairFactory)(tinysecp);
+// Initialize ECC library for bitcoinjs-lib v6+
+// This is required before using Psbt or other ECC operations
+bitcoin.initEccLib(tinysecp);
 class BitcoinService {
     constructor() {
         this.currentEndpointIndex = 0;

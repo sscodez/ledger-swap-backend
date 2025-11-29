@@ -16,6 +16,7 @@ const express_1 = require("express");
 const passport_1 = __importDefault(require("passport"));
 const authController_1 = require("../controllers/authController");
 const rateLimit_1 = require("../middleware/rateLimit");
+const authMiddleware_1 = require("../middleware/authMiddleware");
 const router = (0, express_1.Router)();
 /**
  * @openapi
@@ -214,6 +215,47 @@ router.get('/facebook/callback', passport_1.default.authenticate('facebook', { f
 router.post('/forgot-password', rateLimit_1.loginRateLimit, authController_1.forgotPassword);
 /**
  * @openapi
+ * /api/auth/verify-reset-code:
+ *   post:
+ *     summary: Verify password reset code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               code:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *             required: [email, code]
+ *     responses:
+ *       '200':
+ *         description: Verification code confirmed, reset token provided
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 resetToken:
+ *                   type: string
+ *                 tokenExpires:
+ *                   type: number
+ *       '400':
+ *         description: Invalid or expired verification code
+ *       '500':
+ *         description: Server error
+ */
+router.post('/verify-reset-code', authController_1.verifyResetCode);
+/**
+ * @openapi
  * /api/auth/reset-password:
  *   post:
  *     summary: Reset password with token
@@ -240,4 +282,167 @@ router.post('/forgot-password', rateLimit_1.loginRateLimit, authController_1.for
  *         description: Server error
  */
 router.post('/reset-password', authController_1.resetPassword);
+// Email Verification Routes
+/**
+ * @openapi
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Verify email address with token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *             required: [token]
+ *     responses:
+ *       '200':
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     _id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     emailVerified:
+ *                       type: boolean
+ *                 token:
+ *                   type: string
+ *       '400':
+ *         description: Invalid or expired verification token
+ *       '500':
+ *         description: Server error
+ */
+router.post('/verify-email', authController_1.verifyEmail);
+/**
+ * @openapi
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required: [email]
+ *     responses:
+ *       '200':
+ *         description: Verification email sent (if account exists and is unverified)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 tokenExpires:
+ *                   type: number
+ *       '400':
+ *         description: Email already verified or OAuth account
+ *       '500':
+ *         description: Server error
+ */
+router.post('/resend-verification', rateLimit_1.loginRateLimit, authController_1.resendEmailVerification);
+/**
+ * @openapi
+ * /api/auth/2fa/start:
+ *   post:
+ *     summary: Initiate two-factor authentication setup
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       '200':
+ *         description: Returns QR code and secret for setup
+ */
+router.post('/2fa/start', authMiddleware_1.protect, authController_1.startTwoFactorSetup);
+/**
+ * @openapi
+ * /api/auth/2fa/verify-setup:
+ *   post:
+ *     summary: Confirm and enable two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: 6-digit TOTP code
+ *             required: [token]
+ *     responses:
+ *       '200':
+ *         description: Two-factor authentication enabled
+ */
+router.post('/2fa/verify-setup', authMiddleware_1.protect, authController_1.verifyTwoFactorSetup);
+/**
+ * @openapi
+ * /api/auth/2fa/disable:
+ *   post:
+ *     summary: Disable two-factor authentication
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       '200':
+ *         description: Two-factor authentication disabled
+ */
+router.post('/2fa/disable', authMiddleware_1.protect, authController_1.disableTwoFactor);
+/**
+ * @openapi
+ * /api/auth/2fa/verify-login:
+ *   post:
+ *     summary: Verify TOTP during login
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               loginToken:
+ *                 type: string
+ *               code:
+ *                 type: string
+ *             required: [loginToken, code]
+ *     responses:
+ *       '200':
+ *         description: Login completed
+ */
+router.post('/2fa/verify-login', rateLimit_1.loginRateLimit, authController_1.verifyTwoFactorLogin);
 exports.default = router;

@@ -12,6 +12,7 @@ export const getUserProfile: RequestHandler = async (req: Request, res: Response
       phone: authReq.user.phone,
       country: authReq.user.country,
       profilePicture: authReq.user.profilePicture,
+      twoFactorEnabled: authReq.user.twoFactorEnabled,
     });
   } else {
     res.status(404).json({ message: 'User not found' });
@@ -42,6 +43,7 @@ export const updateUserProfile: RequestHandler = async (req: Request, res: Respo
       phone: updatedUser.phone,
       country: updatedUser.country,
       profilePicture: updatedUser.profilePicture,
+      twoFactorEnabled: updatedUser.twoFactorEnabled,
     });
   } else {
     res.status(404).json({ message: 'User not found' });

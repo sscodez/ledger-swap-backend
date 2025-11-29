@@ -1,10 +1,206 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
-import User from '../models/User';
+import QRCode from 'qrcode';
+import speakeasy from 'speakeasy';
+import User, { IUser } from '../models/User';
 import Overview from '../models/Overview';
 import generateToken from '../utils/generateToken';
+import { AuthRequest } from '../middleware/authMiddleware';
 import { sendPasswordResetEmail, sendPasswordResetConfirmation, generateVerificationCode, sendEmailVerification, sendWelcomeEmail, generateEmailVerificationToken } from '../services/emailService';
+
+const TWO_FACTOR_LOGIN_EXPIRATION_MINUTES = 10;
+
+const buildUserPayload = (user: IUser) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  emailVerified: user.emailVerified,
+  role: user.role,
+  twoFactorEnabled: !!user.twoFactorEnabled,
+});
+
+const respondWithAuthSuccess = (user: IUser, res: Response) => {
+  const token = generateToken(String(user._id));
+  res.json({
+    ...buildUserPayload(user),
+    token,
+  });
+};
+
+const triggerTwoFactorChallenge = async (user: IUser, res: Response) => {
+  if (!user.twoFactorSecret) {
+    return respondWithAuthSuccess(user, res);
+  }
+
+  user.twoFactorLoginToken = crypto.randomBytes(24).toString('hex');
+  user.twoFactorLoginExpires = new Date(Date.now() + TWO_FACTOR_LOGIN_EXPIRATION_MINUTES * 60 * 1000);
+  await user.save();
+
+  res.json({
+    requiresTwoFactor: true,
+    loginToken: user.twoFactorLoginToken,
+    expiresIn: TWO_FACTOR_LOGIN_EXPIRATION_MINUTES,
+    message: 'Two-factor authentication required to finish signing in.',
+  });
+};
+
+export const startTwoFactorSetup = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    if (!authReq.user?._id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    const user = await User.findById(authReq.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.twoFactorEnabled) {
+      return res.status(400).json({ message: 'Two-factor authentication is already enabled.' });
+    }
+
+    const secret = speakeasy.generateSecret({ length: 32, name: `LedgerSwap (${user.email})` });
+    user.twoFactorTempSecret = secret.base32;
+    await user.save();
+
+    const qrCode = secret.otpauth_url ? await QRCode.toDataURL(secret.otpauth_url) : null;
+
+    res.json({
+      qrCode,
+      otpauthUrl: secret.otpauth_url,
+      secret: secret.base32,
+    });
+  } catch (error) {
+    console.error('startTwoFactorSetup error:', error);
+    res.status(500).json({ message: 'Failed to start two-factor setup' });
+  }
+};
+
+export const verifyTwoFactorSetup = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    if (!authReq.user?._id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ message: 'A valid 6-digit code is required.' });
+    }
+
+    const user = await User.findById(authReq.user._id);
+    if (!user || !user.twoFactorTempSecret) {
+      return res.status(400).json({ message: 'Two-factor setup was not initiated.' });
+    }
+
+    const cleanedToken = token.replace(/\s+/g, '');
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorTempSecret,
+      token: cleanedToken,
+      encoding: 'base32',
+      window: 1,
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid authentication code. Please try again.' });
+    }
+
+    user.twoFactorSecret = user.twoFactorTempSecret;
+    user.twoFactorTempSecret = undefined;
+    user.twoFactorEnabled = true;
+    user.twoFactorEnabledAt = new Date();
+    await user.save();
+
+    res.json({ message: 'Two-factor authentication enabled successfully.' });
+  } catch (error) {
+    console.error('verifyTwoFactorSetup error:', error);
+    res.status(500).json({ message: 'Failed to verify two-factor setup.' });
+  }
+};
+
+export const disableTwoFactor = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    if (!authReq.user?._id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    const { token } = req.body;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ message: 'A valid 6-digit code is required.' });
+    }
+
+    const user = await User.findById(authReq.user._id);
+    if (!user || !user.twoFactorSecret) {
+      return res.status(400).json({ message: 'Two-factor authentication is not enabled.' });
+    }
+
+    const cleanedToken = token.replace(/\s+/g, '');
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      token: cleanedToken,
+      encoding: 'base32',
+      window: 1,
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid authentication code. Please try again.' });
+    }
+
+    user.twoFactorEnabled = false;
+    user.twoFactorSecret = undefined;
+    user.twoFactorTempSecret = undefined;
+    user.twoFactorEnabledAt = undefined;
+    user.twoFactorLoginToken = undefined;
+    user.twoFactorLoginExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Two-factor authentication disabled.' });
+  } catch (error) {
+    console.error('disableTwoFactor error:', error);
+    res.status(500).json({ message: 'Failed to disable two-factor authentication.' });
+  }
+};
+
+export const verifyTwoFactorLogin = async (req: Request, res: Response) => {
+  try {
+    const { loginToken, code } = req.body;
+    if (!loginToken || !code) {
+      return res.status(400).json({ message: 'Login token and authentication code are required.' });
+    }
+
+    const user = await User.findOne({
+      twoFactorLoginToken: loginToken,
+      twoFactorLoginExpires: { $gt: new Date() },
+    });
+
+    if (!user || !user.twoFactorSecret) {
+      return res.status(400).json({ message: 'Invalid or expired login token.' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      token: String(code).replace(/\s+/g, ''),
+      encoding: 'base32',
+      window: 1,
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid authentication code. Please try again.' });
+    }
+
+    user.twoFactorLoginToken = undefined;
+    user.twoFactorLoginExpires = undefined;
+    await user.save();
+
+    respondWithAuthSuccess(user, res);
+  } catch (error) {
+    console.error('verifyTwoFactorLogin error:', error);
+    res.status(500).json({ message: 'Failed to verify authentication code. Please try again.' });
+  }
+};
 
 // Debug endpoint to check OAuth configuration
 export const debugOAuth = async (req: Request, res: Response) => {
@@ -116,14 +312,10 @@ export const adminSignin = async (req: Request, res: Response) => {
     }
 
     if (user.password && (await bcrypt.compare(password, user.password))) {
-      const token = generateToken(String(user._id));
-      return res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        token,
-        role: user.role,
-      });
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        return triggerTwoFactorChallenge(user, res);
+      }
+      return respondWithAuthSuccess(user, res);
     }
 
     return res.status(401).json({ message: 'Invalid email or password' });
@@ -152,14 +344,11 @@ export const signin = async (req: Request, res: Response) => {
         });
       }
 
-      const token = generateToken(String(user._id));
-      res.json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        token,
-      });
+      if (user.twoFactorEnabled && user.twoFactorSecret) {
+        return triggerTwoFactorChallenge(user, res);
+      }
+
+      return respondWithAuthSuccess(user, res);
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
     }

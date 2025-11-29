@@ -13,16 +13,39 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.escalateToDispute = exports.updateContactStatus = exports.getAllContacts = exports.createContact = void 0;
+const axios_1 = __importDefault(require("axios"));
 const Contact_1 = __importDefault(require("../models/Contact"));
 const Dispute_1 = __importDefault(require("../models/Dispute"));
+const emailService_1 = require("../services/emailService");
 // POST /api/contacts - Create a new contact submission
 const createContact = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, email, subject, message, category = 'general' } = req.body;
+        const { name, email, subject, message, category = 'general', recaptchaToken } = req.body;
         if (!name || !email || !subject || !message) {
             return res.status(400).json({
                 message: 'Name, email, subject, and message are required'
             });
+        }
+        const recaptchaSecret = process.env.RECAPTCHA_SECRET_KEY;
+        if (recaptchaSecret) {
+            if (!recaptchaToken) {
+                return res.status(400).json({ message: 'reCAPTCHA verification failed. Please try again.' });
+            }
+            try {
+                const verifyResponse = yield axios_1.default.post('https://www.google.com/recaptcha/api/siteverify', null, {
+                    params: {
+                        secret: recaptchaSecret,
+                        response: recaptchaToken
+                    }
+                });
+                if (!verifyResponse.data.success) {
+                    return res.status(400).json({ message: 'reCAPTCHA verification failed. Please try again.' });
+                }
+            }
+            catch (captchaError) {
+                console.error('reCAPTCHA verification error:', captchaError);
+                return res.status(500).json({ message: 'Failed to verify reCAPTCHA. Please try again later.' });
+            }
         }
         // Determine if this should be treated as a dispute based on category or keywords
         const disputeKeywords = ['dispute', 'problem', 'issue', 'complaint', 'refund', 'lost', 'stolen', 'fraud'];
@@ -50,6 +73,15 @@ const createContact = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             isDispute,
             status: 'open'
         });
+        // Send corridor confirmation email to the user
+        try {
+            yield (0, emailService_1.sendCorridorConfirmationEmail)(email, name);
+            console.log('Corridor confirmation email sent to:', email);
+        }
+        catch (emailError) {
+            console.error('Failed to send corridor confirmation email:', emailError);
+            // Don't fail the contact creation if email fails
+        }
         return res.status(201).json({
             message: 'Contact submission received successfully',
             contact: {

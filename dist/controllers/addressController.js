@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.deleteAddress = exports.getAddresses = exports.createAddress = void 0;
+exports.updateAddress = exports.deleteAddress = exports.getAddresses = exports.createAddress = void 0;
 const Address_1 = __importDefault(require("../models/Address"));
 const createAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const authReq = req;
@@ -78,3 +78,31 @@ const deleteAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     }
 });
 exports.deleteAddress = deleteAddress;
+const updateAddress = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const authReq = req;
+    const { coin, network, label, address } = req.body;
+    try {
+        const existingAddress = yield Address_1.default.findById(req.params.id);
+        if (!existingAddress) {
+            return res.status(404).json({ message: 'Address not found' });
+        }
+        if (existingAddress.user.toString() !== String(authReq.user._id)) {
+            return res.status(401).json({ message: 'Not authorized' });
+        }
+        existingAddress.coin = coin !== null && coin !== void 0 ? coin : existingAddress.coin;
+        existingAddress.network = network !== null && network !== void 0 ? network : existingAddress.network;
+        existingAddress.label = label !== null && label !== void 0 ? label : existingAddress.label;
+        existingAddress.address = address !== null && address !== void 0 ? address : existingAddress.address;
+        const updated = yield existingAddress.save();
+        res.json(updated);
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            res.status(500).json({ message: 'Server error', error: error.message });
+        }
+        else {
+            res.status(500).json({ message: 'An unknown error occurred' });
+        }
+    }
+});
+exports.updateAddress = updateAddress;

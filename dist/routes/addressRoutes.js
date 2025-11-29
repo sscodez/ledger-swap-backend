@@ -51,5 +51,5 @@ router.route('/').post(authMiddleware_1.protect, addressController_1.createAddre
  *       '200':
  *         description: Address deleted
  */
-router.route('/:id').delete(authMiddleware_1.protect, addressController_1.deleteAddress);
+router.route('/:id').delete(authMiddleware_1.protect, addressController_1.deleteAddress).put(authMiddleware_1.protect, addressController_1.updateAddress);
 exports.default = router;

@@ -22,6 +22,12 @@ export interface IUser extends Document {
   emailVerified?: boolean;
   emailVerificationToken?: string;
   emailVerificationExpires?: Date;
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string;
+  twoFactorTempSecret?: string;
+  twoFactorEnabledAt?: Date;
+  twoFactorLoginToken?: string;
+  twoFactorLoginExpires?: Date;
 }
 
 const userSchema: Schema = new Schema({
@@ -92,6 +98,27 @@ const userSchema: Schema = new Schema({
   },
   emailVerificationExpires: {
     type: Date,
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
+  twoFactorSecret: {
+    type: String,
+  },
+  twoFactorTempSecret: {
+    type: String,
+  },
+  twoFactorEnabledAt: {
+    type: Date,
+  },
+  twoFactorLoginToken: {
+    type: String,
+  },
+  twoFactorLoginExpires: {
+    type: Date,
+    index: true,
   },
 }, {
   timestamps: true,
