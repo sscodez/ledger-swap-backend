@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import passport from 'passport';
-import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword, verifyEmail, resendEmailVerification, startTwoFactorSetup, verifyTwoFactorSetup, disableTwoFactor, verifyTwoFactorLogin } from '../controllers/authController';
+import { signup, signin, googleCallback, facebookCallback, adminSignin, debugOAuth, forgotPassword, verifyResetCode, resetPassword, verifyEmail, resendEmailVerification, startTwoFactorSetup, verifyTwoFactorSetup, disableTwoFactor, verifyTwoFactorLogin, changePassword } from '../controllers/authController';
 import { loginRateLimit } from '../middleware/rateLimit';
 import { protect } from '../middleware/authMiddleware';
 
@@ -286,6 +286,32 @@ router.post('/verify-reset-code', verifyResetCode);
  *         description: Server error
  */
 router.post('/reset-password', resetPassword);
+
+/**
+ * @openapi
+ * /api/auth/change-password:
+ *   post:
+ *     summary: Change password for authenticated user
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *             required: [currentPassword, newPassword]
+ *     responses:
+ *       '200':
+ *         description: Password changed successfully
+ */
+router.post('/change-password', protect, changePassword);
 
 // Email Verification Routes
 /**

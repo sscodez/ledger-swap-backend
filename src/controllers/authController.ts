@@ -548,6 +548,42 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+export const changePassword = async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    if (!authReq.user?._id) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new passwords are required' });
+    }
+
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters long' });
+    }
+
+    const user = await User.findById(authReq.user._id).select('+password');
+    if (!user || !user.password) {
+      return res.status(400).json({ message: 'Password change is unavailable for this account' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('changePassword error:', error);
+    res.status(500).json({ message: 'Failed to update password. Please try again.' });
+  }
+};
+
 // Verify Email - Verify email address with token
 export const verifyEmail = async (req: Request, res: Response) => {
   try {

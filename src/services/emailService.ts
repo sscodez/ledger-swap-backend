@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import crypto from 'crypto';
+import { logIntentEvent } from './intentLogService';
 
 // Email service with Titan email SMTP support
 const createTransporter = () => {
@@ -35,6 +36,22 @@ const createTransporter = () => {
       rejectUnauthorized: false // For compatibility with Titan email
     }
   });
+};
+
+const logEmailIntent = async (message: string, to: string, metadata?: Record<string, unknown>) => {
+  try {
+    await logIntentEvent({
+      eventType: 'email',
+      message,
+      metadata: {
+        to,
+        ...metadata,
+      },
+      source: 'titanmail',
+    });
+  } catch (error) {
+    console.warn('Failed to log email intent', error);
+  }
 };
 
 // Generate 6-digit verification code
@@ -92,6 +109,7 @@ export const sendPasswordResetEmail = async (email: string, resetCode: string) =
 
     await transporter.sendMail(mailOptions);
     console.log('Password reset code sent successfully to:', email);
+    logEmailIntent('Password reset code emailed', email, { template: 'password_reset_code' });
     return true;
   } catch (error) {
     console.error('Error sending password reset email:', error);
@@ -136,6 +154,7 @@ export const sendPasswordResetEmailWithToken = async (email: string, resetToken:
 
     await transporter.sendMail(mailOptions);
     console.log('Password reset email sent successfully');
+    logEmailIntent('Password reset link emailed', email, { template: 'password_reset_link' });
     return true;
   } catch (error) {
     console.error('Error sending password reset email:', error);
@@ -186,6 +205,7 @@ export const sendPasswordResetConfirmation = async (email: string) => {
 
     await transporter.sendMail(mailOptions);
     console.log('Password reset confirmation email sent successfully');
+    logEmailIntent('Password reset confirmation emailed', email, { template: 'password_reset_confirmation' });
     return true;
   } catch (error) {
     console.error('Error sending password reset confirmation email:', error);
@@ -251,6 +271,7 @@ export const sendAdminSupportEmail = async (subject: string, message: string, fr
       console.log('Admin support email logged (SMTP not configured) to:', adminEmail);
     }
 
+    logEmailIntent('Admin support email sent', fromEmail || adminEmail, { subject, mode: isSmtpConfigured ? 'smtp' : 'mock' });
     return { success: true, mode: isSmtpConfigured ? 'smtp' : 'mock' };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown email error';
@@ -283,9 +304,7 @@ export const sendEmailVerification = async (email: string, verificationToken: st
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 10px; text-align: center;">
-            <div style="width: 60px; height: 60px; background: #007bff; border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;">
-              <span style="color: white; font-size: 24px;">✉</span>
-            </div>
+        
             <h2 style="color: #001233; margin: 0 0 20px 0;">Verify Your Email Address</h2>
             <p style="color: #666; margin: 0 0 30px 0;">Welcome to LedgerSwap! Please verify your email address to complete your account setup and start trading securely.</p>
             
@@ -316,6 +335,7 @@ export const sendEmailVerification = async (email: string, verificationToken: st
 
     await transporter.sendMail(mailOptions);
     console.log('Email verification sent successfully to:', email);
+    logEmailIntent('Email verification sent', email, { template: 'email_verification' });
     return true;
   } catch (error) {
     console.error('Error sending email verification:', error);
@@ -382,6 +402,7 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
 
     await transporter.sendMail(mailOptions);
     console.log('Welcome email sent successfully to:', email);
+    logEmailIntent('Welcome email sent', email, { template: 'welcome' });
     return true;
   } catch (error) {
     console.error('Error sending welcome email:', error);
@@ -472,6 +493,7 @@ export const sendCorridorConfirmationEmail = async (email: string, name: string)
 
     await transporter.sendMail(mailOptions);
     console.log('Corridor confirmation email sent successfully to:', email);
+    logEmailIntent('Corridor confirmation email sent', email, { template: 'corridor_confirmation' });
     return true;
   } catch (error) {
     console.error('Error sending corridor confirmation email:', error);
